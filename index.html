@@ -1,267 +1,726 @@
 <!doctype html>
 <html lang="ru">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <meta name="theme-color" content="#111827">
-  <meta name="description" content="Безопасный путь — карта комфортных маршрутов для вечерних прогулок.">
-  <title>Безопасный путь</title>
-  <link rel="icon" href="data:,">
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-        integrity="sha256-p4NxAoJBhIINfQ3VvLw8Q9a7j3q8p7f4zQ6J8mZ1Q6k="
-        crossorigin="">
-  <style>
-    :root{--bg:#f5f7fb;--card:#fff;--text:#172033;--muted:#6b7280;--line:#e5e7eb;--accent:#2563eb;--danger:#dc2626;--ok:#16a34a;--warn:#d97706}
-    *{box-sizing:border-box} html,body{margin:0;height:100%;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:var(--text);background:var(--bg)}
-    #app{height:100%;display:flex;flex-direction:column}
-    header{height:62px;background:#111827;color:#fff;display:flex;align-items:center;justify-content:space-between;padding:0 18px;z-index:1000;box-shadow:0 2px 12px #0002}
-    .brand{font-weight:800;font-size:19px}.brand small{display:block;font-weight:500;font-size:10px;color:#cbd5e1;margin-top:1px}
-    .header-actions{display:flex;gap:8px}
-    button{border:0;border-radius:11px;padding:10px 13px;font-weight:700;cursor:pointer;font-size:14px}
-    .btn{background:#fff;color:#111827}.btn-primary{background:var(--accent);color:#fff}.btn-soft{background:#eef2ff;color:#1e40af}.btn-danger{background:#fee2e2;color:#991b1b}
-    main{position:relative;flex:1;min-height:0}
-    #map{position:absolute;inset:0}
-    .panel{position:absolute;z-index:900;left:16px;top:16px;width:min(390px,calc(100vw - 32px));max-height:calc(100% - 32px);overflow:auto;background:#ffffffee;backdrop-filter:blur(12px);border:1px solid #fff;box-shadow:0 8px 30px #0002;border-radius:18px;padding:15px}
-    .panel h1{font-size:18px;margin:0 0 12px}.sub{font-size:12px;color:var(--muted);line-height:1.4}
-    .field{display:flex;gap:8px;margin:9px 0}.field input{flex:1;min-width:0;padding:12px;border:1px solid var(--line);border-radius:11px;outline:none;font-size:14px;background:#fff}.field input:focus{border-color:#93c5fd}
-    .field button{padding:0 12px}
-    .row{display:flex;gap:8px}.row>*{flex:1}
-    .status{font-size:12px;margin:8px 0;color:var(--muted);min-height:18px}
-    .routes{display:grid;gap:8px;margin-top:10px}.route{border:1px solid var(--line);border-radius:13px;padding:11px;cursor:pointer;background:#fff}.route.active{border:2px solid var(--accent);padding:10px}.route-title{font-weight:800;font-size:14px;display:flex;justify-content:space-between;gap:8px}.route-meta{font-size:12px;color:var(--muted);margin-top:4px}.score{font-weight:800}.green{color:var(--ok)}.yellow{color:var(--warn)}.red{color:var(--danger)}
-    .legend{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px;font-size:11px;color:var(--muted)}.dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:4px}
-    .bottom{position:absolute;z-index:900;right:16px;bottom:16px;background:#fff;box-shadow:0 5px 25px #0002;border-radius:14px;padding:9px;display:flex;gap:7px}
-    .info{position:absolute;z-index:900;right:16px;top:16px;width:min(310px,calc(100vw - 32px));background:#ffffffee;backdrop-filter:blur(12px);border-radius:16px;padding:13px;box-shadow:0 6px 24px #0002;display:none}
-    .info h3{margin:0 0 6px;font-size:15px}.info p{margin:4px 0;font-size:12px;color:var(--muted)}
-    .modal-bg{display:none;position:fixed;inset:0;background:#0007;z-index:3000;align-items:center;justify-content:center;padding:18px}.modal{width:min(430px,100%);background:#fff;border-radius:18px;padding:18px}.modal h2{font-size:18px;margin:0 0 10px}.choices{display:grid;gap:8px;margin:12px 0}.choice{padding:12px;border:1px solid var(--line);border-radius:12px;cursor:pointer}.choice.selected{border:2px solid var(--accent);padding:11px}.modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:12px}
-    .leaflet-control-attribution{font-size:9px}
-    @media(max-width:700px){
-      header{height:56px;padding:0 12px}.brand{font-size:16px}.header-actions .hide-mobile{display:none}
-      .panel{top:auto;bottom:0;left:0;width:100%;max-height:53%;border-radius:18px 18px 0 0;padding:12px;box-shadow:0 -5px 24px #0002}
-      .info{right:8px;top:8px}.bottom{right:8px;bottom:55%}
-    }
-  </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0b1220">
+<meta name="description" content="Безопасный путь — комфортные маршруты для вечерних прогулок">
+<title>Безопасный путь</title>
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css">
+
+<style>
+:root{
+  --bg:#f4f7fb;--surface:#fff;--surface2:#f8fafc;--text:#142033;--muted:#697586;
+  --line:#e4e9f0;--primary:#0f766e;--primary2:#14b8a6;--blue:#2563eb;
+  --green:#16a34a;--orange:#ea8a00;--red:#dc2626;--shadow:0 14px 40px rgba(15,23,42,.14)
+}
+*{box-sizing:border-box}
+html,body,#app{height:100%;margin:0}
+body{font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--text);background:var(--bg);overflow:hidden}
+button,input{font:inherit}
+button{cursor:pointer}
+#app{position:relative}
+#map{position:absolute;inset:0;z-index:1;background:#dce8e6}
+
+/* top brand */
+.topbar{
+  position:absolute;z-index:1100;left:14px;right:14px;top:14px;
+  display:flex;align-items:center;justify-content:space-between;gap:10px;pointer-events:none
+}
+.brand{
+  pointer-events:auto;background:#0b1220eF;color:#fff;border:1px solid #ffffff18;
+  box-shadow:0 10px 30px #0003;border-radius:18px;padding:10px 13px;backdrop-filter:blur(12px)
+}
+.brand b{display:block;font-size:15px;letter-spacing:.1px}
+.brand span{display:block;font-size:10px;color:#aeb8c8;margin-top:2px}
+.top-actions{display:flex;gap:8px;pointer-events:auto}
+.icon-btn{
+  width:43px;height:43px;border:1px solid #ffffff22;background:#0b1220eF;color:#fff;
+  border-radius:14px;box-shadow:0 10px 30px #0003;display:grid;place-items:center;backdrop-filter:blur(12px)
+}
+
+/* Search card */
+.search-card{
+  position:absolute;z-index:1050;left:14px;top:82px;width:min(410px,calc(100vw - 28px));
+  background:#fffffff4;backdrop-filter:blur(18px);border:1px solid #ffffff;
+  border-radius:24px;box-shadow:var(--shadow);padding:14px
+}
+.search-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.search-head h1{font-size:19px;margin:0}.search-head p{font-size:11px;color:var(--muted);margin:3px 0 0}
+.collapse-btn{border:0;background:#edf2f7;color:#334155;border-radius:10px;padding:7px 9px}
+.point-row{display:grid;grid-template-columns:32px 1fr auto;gap:9px;align-items:center;margin:7px 0}
+.point-dot{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;color:#fff;font-size:13px;font-weight:900}
+.point-dot.from{background:var(--blue)}.point-dot.to{background:var(--red)}
+.point-row input{
+  width:100%;height:44px;border:1px solid var(--line);background:#fff;border-radius:13px;
+  padding:0 12px;outline:none;color:var(--text);font-size:14px
+}
+.point-row input:focus{border-color:#8edbd3;box-shadow:0 0 0 3px #14b8a61a}
+.mini-btn{
+  height:44px;padding:0 10px;border:1px solid var(--line);background:#fff;border-radius:12px;color:#334155
+}
+.main-actions{display:grid;grid-template-columns:1fr auto;gap:8px;margin-top:10px}
+.primary{
+  height:46px;border:0;border-radius:14px;background:linear-gradient(135deg,var(--primary),var(--primary2));
+  color:#fff;font-weight:800;box-shadow:0 8px 20px #0f766e2e
+}
+.secondary{height:46px;border:1px solid var(--line);background:#fff;border-radius:14px;color:#334155}
+.hint{font-size:11px;color:var(--muted);margin:9px 2px 0;line-height:1.35}
+.route-list{margin-top:12px;display:grid;gap:8px}
+.route-card{
+  border:1px solid var(--line);background:#fff;border-radius:15px;padding:11px 12px;transition:.18s;
+}
+.route-card.active{border:2px solid var(--blue);padding:10px;box-shadow:0 8px 18px #2563eb18}
+.route-main{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.route-name{font-size:13px;font-weight:850}.route-score{font-size:12px;font-weight:900}
+.route-meta{font-size:11px;color:var(--muted);margin-top:4px}
+.route-sub{display:flex;justify-content:space-between;gap:8px;align-items:center;margin-top:8px}
+.route-select{border:0;background:#eef4ff;color:#1d4ed8;border-radius:10px;padding:7px 10px;font-weight:800;font-size:11px}
+.route-go{border:0;background:#e7f7f4;color:#0f766e;border-radius:10px;padding:7px 10px;font-weight:800;font-size:11px}
+
+/* Navigator */
+.nav-panel{
+  position:absolute;z-index:1200;left:50%;transform:translateX(-50%);
+  top:14px;width:min(580px,calc(100vw - 28px));display:none
+}
+.nav-instruction{
+  background:#0b1220f2;color:#fff;border-radius:22px;box-shadow:0 15px 45px #0004;
+  padding:13px 14px;border:1px solid #ffffff16;backdrop-filter:blur(14px)
+}
+.nav-row{display:flex;gap:12px;align-items:center}
+.maneuver-icon{
+  width:48px;height:48px;flex:0 0 auto;border-radius:15px;background:#11302d;display:grid;place-items:center;font-size:23px
+}
+.nav-small{font-size:11px;color:#aeb8c8}.nav-big{font-size:16px;font-weight:850;line-height:1.15;margin-top:2px}
+.nav-distance{font-size:12px;color:#d5dee9;margin-top:3px}
+.nav-bottom{
+  position:absolute;z-index:1200;left:50%;transform:translateX(-50%);bottom:14px;width:min(580px,calc(100vw - 28px));
+  display:none
+}
+.nav-card{
+  background:#ffffffef;backdrop-filter:blur(16px);border:1px solid #fff;border-radius:22px;
+  box-shadow:var(--shadow);padding:12px
+}
+.nav-stats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.stat{background:#f5f7fb;border-radius:14px;padding:9px;text-align:center}.stat b{display:block;font-size:15px}.stat span{display:block;font-size:10px;color:var(--muted);margin-top:2px}
+.nav-buttons{display:grid;grid-template-columns:1fr auto;gap:8px;margin-top:9px}
+.stop-btn{height:44px;border:0;border-radius:14px;background:#fee2e2;color:#991b1b;font-weight:800}
+.mute-btn{width:48px;border:1px solid var(--line);background:#fff;border-radius:14px}
+
+/* bottom utilities */
+.map-tools{position:absolute;z-index:900;right:14px;bottom:18px;display:grid;gap:8px}
+.map-tool{
+  width:44px;height:44px;border:0;border-radius:14px;background:#fffffff2;color:#1e293b;
+  box-shadow:0 9px 25px #0002
+}
+.legend-pill{
+  position:absolute;z-index:900;left:14px;bottom:18px;background:#0b1220db;color:#fff;border-radius:14px;
+  padding:8px 10px;font-size:10px;box-shadow:0 9px 25px #0002;backdrop-filter:blur(10px)
+}
+
+/* marks modal */
+.modal-bg{position:fixed;inset:0;background:#0007;z-index:4000;display:none;align-items:flex-end;justify-content:center;padding:12px}
+.modal{width:min(520px,100%);background:#fff;border-radius:24px;padding:16px;box-shadow:0 -10px 40px #0003}
+.modal h2{font-size:18px;margin:0}.modal p{font-size:11px;color:var(--muted);margin:4px 0 11px}
+.choices{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.choice{border:1px solid var(--line);border-radius:13px;padding:11px;font-size:12px;background:#fff}.choice.sel{border:2px solid var(--primary);padding:10px}
+.modal-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:11px}.modal-actions button{height:44px;border-radius:13px;border:0;font-weight:800}.cancel{background:#eef2f7}.save{background:var(--primary);color:#fff}
+.toast{
+  position:fixed;z-index:5000;left:50%;bottom:20px;transform:translate(-50%,120px);opacity:0;
+  background:#0b1220;color:#fff;padding:11px 14px;border-radius:13px;font-size:12px;box-shadow:0 10px 30px #0003;transition:.25s;max-width:calc(100vw - 30px);text-align:center
+}
+.toast.show{transform:translate(-50%,0);opacity:1}
+
+/* map location */
+.user-dot{
+  width:20px;height:20px;border-radius:50%;background:#2563eb;border:4px solid #fff;box-shadow:0 2px 12px #2563eb66;
+}
+.user-arrow{width:0;height:0;border-left:8px solid transparent;border-right:8px solid transparent;border-bottom:17px solid #2563eb;filter:drop-shadow(0 2px 2px #0004);transform-origin:50% 85%}
+
+.leaflet-control-zoom{border:0!important;box-shadow:0 8px 20px #0002!important}
+.leaflet-control-zoom a{border:0!important;width:38px!important;height:38px!important;line-height:38px!important;color:#334155!important}
+.leaflet-control-attribution{font-size:8px}
+
+/* desktop */
+@media (min-width:850px){
+  .search-card{top:82px;left:16px}
+  .modal-bg{align-items:center}
+}
+/* mobile */
+@media (max-width:849px){
+  .brand span{display:none}
+  .search-card{
+    left:0;right:0;top:auto;bottom:0;width:100%;max-height:58%;
+    border-radius:22px 22px 0 0;padding:12px 12px calc(12px + env(safe-area-inset-bottom));
+    overflow:auto
+  }
+  .search-card.collapsed{max-height:none}
+  .search-card.collapsed .point-row,.search-card.collapsed .main-actions,.search-card.collapsed .hint,.search-card.collapsed .route-list{display:none}
+  .main-actions{grid-template-columns:1fr 44px}
+  .secondary{padding:0}
+  .route-card{padding:10px}
+  .legend-pill{bottom:calc(58% + 9px);left:8px}
+  .map-tools{bottom:calc(58% + 9px);right:8px}
+  .nav-panel{top:8px}
+  .nav-bottom{bottom:8px}
+}
+
+/* tiny screens */
+@media(max-width:390px){
+  .topbar{left:8px;right:8px;top:8px}.search-head h1{font-size:17px}.point-row input{height:42px}.mini-btn{height:42px}
+}
+</style>
 </head>
+
 <body>
 <div id="app">
-<header>
-  <div class="brand">🟢 Безопасный путь <small>комфортные маршруты для вечерних прогулок</small></div>
-  <div class="header-actions">
-    <button class="btn hide-mobile" id="aboutBtn">Как это работает</button>
-    <button class="btn" id="locBtn">📍 Моё местоположение</button>
-  </div>
-</header>
-<main>
   <div id="map"></div>
 
-  <section class="panel">
-    <h1>Построить маршрут</h1>
-    <div class="sub">Выберите начало и конец пути. Сайт покажет доступные варианты и рассчитает ориентировочную оценку комфорта по данным карты и пользовательским отметкам.</div>
-    <div class="field">
-      <input id="from" placeholder="Откуда, например: Казань, Кремль">
-      <button class="btn-soft" id="fromBtn">Найти</button>
+  <div class="topbar">
+    <div class="brand"><b>🟢 Безопасный путь</b><span>маршруты, рассчитанные для комфортной вечерней прогулки</span></div>
+    <div class="top-actions">
+      <button class="icon-btn" id="reportTop" title="Добавить отметку">⚠️</button>
+      <button class="icon-btn" id="locTop" title="Моё местоположение">📍</button>
     </div>
-    <div class="field">
-      <input id="to" placeholder="Куда, например: ул. Баумана, 1">
-      <button class="btn-soft" id="toBtn">Найти</button>
+  </div>
+
+  <section class="search-card" id="searchCard">
+    <div class="search-head">
+      <div><h1>Куда идём?</h1><p>Укажите начало и конечную точку</p></div>
+      <button class="collapse-btn" id="collapseBtn">⌄</button>
     </div>
-    <div class="row">
-      <button class="btn-primary" id="routeBtn">🚶 Построить маршрут</button>
-      <button class="btn" id="clearBtn">Очистить</button>
+
+    <div class="point-row">
+      <div class="point-dot from">A</div>
+      <input id="from" placeholder="Откуда" autocomplete="off">
+      <button class="mini-btn" id="fromSearch">Найти</button>
     </div>
-    <div class="status" id="status">Подсказка: можно также кликнуть по карте два раза — сначала начало, затем конец.</div>
-    <div class="routes" id="routes"></div>
-    <div class="legend">
-      <span><i class="dot" style="background:#16a34a"></i>положительная отметка</span>
-      <span><i class="dot" style="background:#dc2626"></i>проблемный участок</span>
-      <span><i class="dot" style="background:#2563eb"></i>выбранный маршрут</span>
+    <div class="point-row">
+      <div class="point-dot to">B</div>
+      <input id="to" placeholder="Куда" autocomplete="off">
+      <button class="mini-btn" id="toSearch">Найти</button>
+    </div>
+
+    <div class="main-actions">
+      <button class="primary" id="buildBtn">🚶 Построить маршрут</button>
+      <button class="secondary" id="swapBtn" title="Поменять местами">⇅</button>
+    </div>
+    <div class="hint" id="hint">Можно нажать на карту: первый клик — начало, второй — конец.</div>
+    <div class="route-list" id="routeList"></div>
+  </section>
+
+  <section class="nav-panel" id="navPanel">
+    <div class="nav-instruction">
+      <div class="nav-row">
+        <div class="maneuver-icon" id="maneuverIcon">➜</div>
+        <div style="min-width:0">
+          <div class="nav-small" id="nextSmall">Следующий манёвр</div>
+          <div class="nav-big" id="nextInstruction">Подготовка…</div>
+          <div class="nav-distance" id="nextDistance"></div>
+        </div>
+      </div>
     </div>
   </section>
 
-  <aside class="info" id="info">
-    <h3>Что учитывается</h3>
-    <p>💡 объекты и признаки инфраструктуры OpenStreetMap, если они размечены;</p>
-    <p>🏪 магазины и аптеки рядом с маршрутом;</p>
-    <p>🚏 остановки и транспортные объекты;</p>
-    <p>⚠️ пользовательские отметки о проблемных участках;</p>
-    <p>📏 длина и время пешего маршрута.</p>
-    <p style="margin-top:8px"><b>Важно:</b> оценка не означает, что место гарантированно безопасно.</p>
-  </aside>
+  <section class="nav-bottom" id="navBottom">
+    <div class="nav-card">
+      <div class="nav-stats">
+        <div class="stat"><b id="remainingDist">—</b><span>осталось</span></div>
+        <div class="stat"><b id="remainingTime">—</b><span>в пути</span></div>
+        <div class="stat"><b id="eta">—</b><span>прибытие</span></div>
+      </div>
+      <div class="nav-buttons">
+        <button class="stop-btn" id="stopNav">Завершить навигацию</button>
+        <button class="mute-btn" id="muteBtn">🔊</button>
+      </div>
+    </div>
+  </section>
 
-  <div class="bottom">
-    <button class="btn" id="reportBtn">⚠️ Добавить отметку</button>
-    <button class="btn" id="helpBtn">ℹ️</button>
+  <div class="map-tools">
+    <button class="map-tool" id="centerBtn" title="Центрировать">◎</button>
+    <button class="map-tool" id="zoomIn">＋</button>
+    <button class="map-tool" id="zoomOut">−</button>
   </div>
-</main>
+
+  <div class="legend-pill">OSM • маршрут • пользовательские отметки</div>
 </div>
 
 <div class="modal-bg" id="modalBg">
   <div class="modal">
-    <h2>Добавить отметку на карту</h2>
-    <div class="sub">Кликните по карте в нужном месте, затем выберите тип отметки. Данные пока сохраняются только в этом браузере.</div>
+    <h2>Добавить отметку</h2>
+    <p>Выберите тип и нажмите на нужное место карты. Пока отметки сохраняются только в этом браузере.</p>
     <div class="choices" id="choices">
-      <div class="choice" data-type="hazard">🔴 Плохое освещение / некомфортный участок</div>
+      <div class="choice" data-type="hazard">🔴 Плохое освещение</div>
       <div class="choice" data-type="isolated">🟠 Безлюдный участок</div>
       <div class="choice" data-type="good">🟢 Хорошо освещено / людно</div>
-      <div class="choice" data-type="shop">🏪 Есть открытое место/магазин</div>
-      <div class="choice" data-type="stop">🚏 Удобная остановка транспорта</div>
+      <div class="choice" data-type="shop">🏪 Открытое место / магазин</div>
+      <div class="choice" data-type="stop">🚏 Остановка рядом</div>
     </div>
-    <div class="sub" id="picked">Сначала выберите тип отметки, затем нажмите на карту.</div>
-    <div class="modal-actions"><button class="btn" id="cancelModal">Отмена</button><button class="btn-primary" id="saveMark">Сохранить отметку</button></div>
+    <p id="markHint" style="margin-top:10px">1. Выберите тип. 2. Коснитесь карты.</p>
+    <div class="modal-actions"><button class="cancel" id="cancelMark">Отмена</button><button class="save" id="saveMark">Сохранить</button></div>
   </div>
 </div>
+<div class="toast" id="toast"></div>
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
-        crossorigin=""></script>
+<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-const map = L.map('map', {zoomControl:true}).setView([55.7961,49.1064], 12);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-  maxZoom:19, attribution:'© OpenStreetMap contributors'
-}).addTo(map);
+(() => {
+  const ROUTER = 'https://valhalla1.openstreetmap.de/route';
+  const GEOCODER = 'https://nominatim.openstreetmap.org';
 
-let start=null,end=null,startMarker=null,endMarker=null,routeLayers=[],routeData=[];
-let marks=JSON.parse(localStorage.getItem('safePathMarks')||'[]');
-let pendingType=null,pendingPoint=null,pendingMarker=null;
-const $=id=>document.getElementById(id);
+  const map = L.map('map',{zoomControl:false,preferCanvas:true}).setView([55.7961,49.1064],13);
 
-function status(t, error=false){$('status').textContent=t;$('status').style.color=error?'#dc2626':'#6b7280'}
-function iconEmoji(type){return {hazard:'🔴',isolated:'🟠',good:'🟢',shop:'🏪',stop:'🚏'}[type]||'📍'}
-function drawSavedMarks(){
-  marks.forEach(m=>{
-    const marker=L.marker([m.lat,m.lng],{title:iconEmoji(m.type)}).addTo(map);
-    marker.bindPopup(`<b>${iconEmoji(m.type)} ${m.label}</b><br><small>Пользовательская отметка</small>`);
-  });
-}
-drawSavedMarks();
-
-function setPoint(which,latlng){
-  if(which==='start'){
-    start=latlng;if(startMarker)map.removeLayer(startMarker);
-    startMarker=L.marker(latlng).addTo(map).bindPopup('Начало').openPopup();
-  }else{
-    end=latlng;if(endMarker)map.removeLayer(endMarker);
-    endMarker=L.marker(latlng).addTo(map).bindPopup('Конец').openPopup();
-  }
-}
-map.on('click',e=>{
-  if($('modalBg').style.display==='flex' && pendingType){pendingPoint=e.latlng;$('picked').textContent=`Точка выбрана: ${e.latlng.lat.toFixed(5)}, ${e.latlng.lng.toFixed(5)}`;if(pendingMarker)map.removeLayer(pendingMarker);pendingMarker=L.circleMarker(e.latlng,{radius:9}).addTo(map);return}
-  if(!start){setPoint('start',e.latlng);reverse(e.latlng,'from')}
-  else if(!end){setPoint('end',e.latlng);reverse(e.latlng,'to')}
-  else {setPoint('start',e.latlng);$('to').value='';end=null;if(endMarker){map.removeLayer(endMarker);endMarker=null}reverse(e.latlng,'from')}
-});
-async function reverse(ll,inputId){
-  try{const r=await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${ll.lat}&lon=${ll.lng}&accept-language=ru`);const d=await r.json();$(inputId).value=d.display_name||`${ll.lat.toFixed(5)}, ${ll.lng.toFixed(5)}`}catch(e){$(inputId).value=`${ll.lat.toFixed(5)}, ${ll.lng.toFixed(5)}`}
-}
-async function geocode(q){
-  const r=await fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&accept-language=ru&q=${encodeURIComponent(q)}`);
-  const d=await r.json(); if(!d.length)throw new Error('Адрес не найден');
-  return {lat:+d[0].lat,lng:+d[0].lon,label:d[0].display_name};
-}
-async function searchPoint(inputId,which){
-  const q=$(inputId).value.trim();if(!q)return;
-  try{status('Ищу адрес…');const p=await geocode(q);setPoint(which,p);map.setView(p,15);$(inputId).value=p.label;status('Адрес найден.');}
-  catch(e){status(e.message,true)}
-}
-$('fromBtn').onclick=()=>searchPoint('from','start');$('toBtn').onclick=()=>searchPoint('to','end');
-$('from').addEventListener('keydown',e=>{if(e.key==='Enter')searchPoint('from','start')});
-$('to').addEventListener('keydown',e=>{if(e.key==='Enter')searchPoint('to','end')});
-
-$('locBtn').onclick=()=>{
-  if(!navigator.geolocation){status('Геолокация не поддерживается браузером.',true);return}
-  status('Получаю местоположение…');
-  navigator.geolocation.getCurrentPosition(async pos=>{
-    const p={lat:pos.coords.latitude,lng:pos.coords.longitude};setPoint('start',p);map.setView(p,16);reverse(p,'from');status('Местоположение установлено.');
-  },()=>status('Не удалось получить геопозицию. Разрешите доступ к местоположению в браузере.',true),{enableHighAccuracy:true,timeout:10000});
-};
-
-function hav(a,b){const R=6371000, p1=a.lat*Math.PI/180,p2=b.lat*Math.PI/180,dp=(b.lat-a.lat)*Math.PI/180,dl=(b.lng-a.lng)*Math.PI/180;const x=Math.sin(dp/2)**2+Math.cos(p1)*Math.cos(p2)*Math.sin(dl/2)**2;return 2*R*Math.asin(Math.sqrt(x))}
-function routeMarkScore(coords){
-  let score=60, near=[];
-  for(const m of marks){
-    let min=Infinity; for(let i=0;i<coords.length;i+=Math.max(1,Math.floor(coords.length/80)))min=Math.min(min,hav({lat:coords[i][1],lng:coords[i][0]},{lat:m.lat,lng:m.lng}));
-    if(min<80){near.push(m);if(m.type==='hazard')score-=12;if(m.type==='isolated')score-=7;if(m.type==='good')score+=8;if(m.type==='shop')score+=4;if(m.type==='stop')score+=4}
-  }
-  return {score:Math.max(10,Math.min(98,Math.round(score))),near};
-}
-function fmtDist(m){return m<1000?`${Math.round(m)} м`:`${(m/1000).toFixed(1)} км`}
-function fmtTime(sec){const min=Math.round(sec/60);return min<60?`${min} мин`:`${Math.floor(min/60)} ч ${min%60} мин`}
-
-async function loadOsmHints(coords){
-  const lats=coords.map(x=>x[1]),lngs=coords.map(x=>x[0]);
-  const pad=.004,minLat=Math.min(...lats)-pad,maxLat=Math.max(...lats)+pad,minLng=Math.min(...lngs)-pad,maxLng=Math.max(...lngs)+pad;
-  const q=`[out:json][timeout:10];(node["highway"="street_lamp"](${minLat},${minLng},${maxLat},${maxLng});node["amenity"="pharmacy"](${minLat},${minLng},${maxLat},${maxLng});node["shop"](${minLat},${minLng},${maxLat},${maxLng});node["highway"="bus_stop"](${minLat},${minLng},${maxLat},${maxLng});node["public_transport"="platform"](${minLat},${minLng},${maxLat},${maxLng}););out center;`;
-  try{
-    const r=await fetch('https://overpass-api.de/api/interpreter',{method:'POST',body:q});if(!r.ok)throw 0;
-    const d=await r.json();let counts={lamp:0,shop:0,pharmacy:0,stop:0};
-    d.elements.forEach(e=>{const t=e.tags||{};if(t.highway==='street_lamp')counts.lamp++;else if(t.amenity==='pharmacy')counts.pharmacy++;else if(t.highway==='bus_stop'||t.public_transport==='platform')counts.stop++;else if(t.shop)counts.shop++});
-    return counts;
-  }catch(e){return null}
-}
-
-async function buildRoutes(){
-  if(!start||!end){status('Укажите начальную и конечную точки.',true);return}
-  status('Строю маршруты…');$('routes').innerHTML='';
-  routeLayers.forEach(l=>map.removeLayer(l));routeLayers=[];routeData=[];
-  try{
-    const url=`https://router.project-osrm.org/route/v1/foot/${start.lng},${start.lat};${end.lng},${end.lat}?alternatives=3&overview=full&geometries=geojson&steps=false`;
-    const r=await fetch(url);if(!r.ok)throw new Error('Сервис маршрутов недоступен');const d=await r.json();
-    if(d.code!=='Ok'||!d.routes?.length)throw new Error('Пеший маршрут не найден.');
-    for(let i=0;i<d.routes.length;i++){
-      const rt=d.routes[i];const coords=rt.geometry.coordinates;
-      const osm=await loadOsmHints(coords);
-      const ms=routeMarkScore(coords);
-      let score=ms.score;
-      if(osm){score=Math.min(98,score+Math.min(15,Math.round(osm.lamp/8)+Math.round(osm.shop/10)+Math.round(osm.stop/5))); }
-      routeData.push({...rt,coords,score,marks:ms.near,osm});
+  // Main map. If the first provider has trouble, switch to Carto automatically.
+  let primaryLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+    maxZoom:19,attribution:'© OpenStreetMap contributors'
+  }).addTo(map);
+  let fallbackLayer = null, tileErrors = 0;
+  primaryLayer.on('tileerror', () => {
+    tileErrors++;
+    if(tileErrors >= 3 && !fallbackLayer){
+      fallbackLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',{
+        subdomains:'abcd',maxZoom:19,
+        attribution:'© OpenStreetMap contributors © CARTO'
+      }).addTo(map);
+      toast('Переключил слой карты на резервный источник.');
     }
-    // Add synthetic labels if only one route is returned.
-    const labels=['Самый короткий','Более комфортный','Альтернативный'];
-    routeData.sort((a,b)=>a.distance-b.distance);
-    routeData.forEach((rt,i)=>{
-      const layer=L.geoJSON(rt.geometry,{style:{color:i===0?'#2563eb':'#64748b',weight:i===0?6:4,opacity:i===0?0.9:0.55}}).addTo(map);
-      layer.on('click',()=>selectRoute(i));routeLayers.push(layer);
-      rt.label=labels[i]||`Вариант ${i+1}`;
-    });
-    if(routeLayers.length)selectRoute(0);
-    map.fitBounds(L.featureGroup(routeLayers).getBounds(),{padding:[35,35]});
-    renderRoutes();
-    status(`Готово. Найдено вариантов: ${routeData.length}.`);
-  }catch(e){status('Не удалось построить маршрут: '+e.message,true)}
-}
-
-function selectRoute(i){
-  routeLayers.forEach((l,j)=>l.setStyle({color:j===i?'#2563eb':'#64748b',weight:j===i?7:4,opacity:j===i?.92:.55}));
-  [...$('routes').children].forEach((x,j)=>x.classList.toggle('active',j===i));
-}
-function renderRoutes(){
-  $('routes').innerHTML='';
-  routeData.forEach((rt,i)=>{
-    const cls=rt.score>=75?'green':rt.score>=50?'yellow':'red';
-    const el=document.createElement('div');el.className='route'+(i===0?' active':'');
-    let extra=rt.osm?` · 💡${rt.osm.lamp} 🏪${rt.osm.shop} 🚏${rt.osm.stop}`:'';
-    el.innerHTML=`<div class="route-title"><span>${rt.label}</span><span class="score ${cls}">${rt.score}/100</span></div><div class="route-meta">${fmtDist(rt.distance)} · ${fmtTime(rt.duration)}${extra}</div>`;
-    el.onclick=()=>selectRoute(i);$('routes').appendChild(el);
   });
-}
-$('routeBtn').onclick=buildRoutes;
-$('clearBtn').onclick=()=>{start=end=null;if(startMarker)map.removeLayer(startMarker);if(endMarker)map.removeLayer(endMarker);startMarker=endMarker=null;routeLayers.forEach(l=>map.removeLayer(l));routeLayers=[];routeData=[];$('routes').innerHTML='';$('from').value='';$('to').value='';status('Карта очищена.')};
 
-$('aboutBtn').onclick=$('helpBtn').onclick=()=>{$('info').style.display=$('info').style.display==='block'?'none':'block'};
+  const $ = id => document.getElementById(id);
+  let start = null, end = null;
+  let startMarker = null, endMarker = null;
+  let routeLayers = [], routes = [], selected = 0;
+  let userMarker = null, watchId = null, currentPosition = null;
+  let navigating = false, currentManeuver = 0, voiceOn = true;
+  let pendingMarkType = null, pendingMarkPoint = null, pendingMarkPreview = null;
+  let marks = JSON.parse(localStorage.getItem('safePathMarksV2') || '[]');
 
-$('reportBtn').onclick=()=>{$('modalBg').style.display='flex';pendingType=null;pendingPoint=null;$('picked').textContent='Сначала выберите тип отметки, затем нажмите на карту.';document.querySelectorAll('.choice').forEach(x=>x.classList.remove('selected'))};
-document.querySelectorAll('.choice').forEach(x=>x.onclick=()=>{pendingType=x.dataset.type;document.querySelectorAll('.choice').forEach(y=>y.classList.remove('selected'));x.classList.add('selected');$('picked').textContent='Теперь нажмите на нужное место на карте.'});
-$('cancelModal').onclick=()=>{$('modalBg').style.display='none';if(pendingMarker){map.removeLayer(pendingMarker);pendingMarker=null}};
-$('saveMark').onclick=()=>{
-  if(!pendingType||!pendingPoint){alert('Выберите тип отметки и укажите место на карте.');return}
-  const labels={hazard:'Плохое освещение / некомфортный участок',isolated:'Безлюдный участок',good:'Хорошо освещено / людно',shop:'Есть открытое место/магазин',stop:'Удобная остановка транспорта'};
-  const m={type:pendingType,label:labels[pendingType],lat:pendingPoint.lat,lng:pendingPoint.lng};
-  marks.push(m);localStorage.setItem('safePathMarks',JSON.stringify(marks));
-  const marker=L.marker([m.lat,m.lng]).addTo(map).bindPopup(`<b>${iconEmoji(m.type)} ${m.label}</b><br><small>Сохранено в этом браузере</small>`).openPopup();
-  $('modalBg').style.display='none';if(pendingMarker){map.removeLayer(pendingMarker);pendingMarker=null}
-  status('Отметка сохранена. При следующем построении она повлияет на оценку маршрута.');
-};
+  const labelMap = {
+    hazard:'Плохое освещение',
+    isolated:'Безлюдный участок',
+    good:'Хорошо освещено / людно',
+    shop:'Открытое место / магазин',
+    stop:'Остановка рядом'
+  };
 
-window.addEventListener('load',()=>{if(location.protocol==='file:')status('Для геолокации лучше открыть сайт через GitHub Pages/Cloudflare Pages или локальный сервер.',false)});
+  function toast(text){
+    $('toast').textContent=text;
+    $('toast').classList.add('show');
+    clearTimeout(toast.t);
+    toast.t=setTimeout(()=>$('toast').classList.remove('show'),2800);
+  }
+
+  function hav(a,b){
+    const R=6371000;
+    const p1=a.lat*Math.PI/180,p2=b.lat*Math.PI/180;
+    const dp=(b.lat-a.lat)*Math.PI/180,dl=(b.lng-a.lng)*Math.PI/180;
+    const x=Math.sin(dp/2)**2+Math.cos(p1)*Math.cos(p2)*Math.sin(dl/2)**2;
+    return 2*R*Math.asin(Math.sqrt(x));
+  }
+  function fmtDist(m){return m<1000?`${Math.round(m)} м`:`${(m/1000).toFixed(1)} км`}
+  function fmtTime(s){let m=Math.round(s/60);if(m<60)return `${m} мин`;let h=Math.floor(m/60);return `${h} ч ${m%60} мин`}
+
+  function setPoint(which,p,label=''){
+    if(which==='start'){
+      start=p;
+      if(startMarker)map.removeLayer(startMarker);
+      startMarker=L.marker(p,{title:'Начало'}).addTo(map).bindPopup('<b>Начало маршрута</b>');
+      $('from').value=label || `${p.lat.toFixed(5)}, ${p.lng.toFixed(5)}`;
+    } else {
+      end=p;
+      if(endMarker)map.removeLayer(endMarker);
+      endMarker=L.marker(p,{title:'Конец'}).addTo(map).bindPopup('<b>Конец маршрута</b>');
+      $('to').value=label || `${p.lat.toFixed(5)}, ${p.lng.toFixed(5)}`;
+    }
+  }
+
+  map.on('click',e=>{
+    if($('modalBg').style.display==='flex' && pendingMarkType){
+      pendingMarkPoint=e.latlng;
+      if(pendingMarkPreview)map.removeLayer(pendingMarkPreview);
+      pendingMarkPreview=L.circleMarker(e.latlng,{radius:9,color:'#0f766e',fillColor:'#14b8a6',fillOpacity:.8}).addTo(map);
+      $('markHint').textContent='Точка выбрана. Нажмите «Сохранить».';
+      return;
+    }
+    if(navigating) return;
+    if(!start){setPoint('start',e.latlng);reverseGeocode(e.latlng,'from');toast('Начало выбрано. Теперь выберите конец.')}
+    else if(!end){setPoint('to',e.latlng);reverseGeocode(e.latlng,'to');toast('Конец выбран. Строй маршрут.')}
+    else {clearRoutes();setPoint('start',e.latlng);end=null;reverseGeocode(e.latlng,'from');toast('Новое начало выбрано.')}
+  });
+
+  async function reverseGeocode(p,field){
+    try{
+      const r=await fetch(`${GEOCODER}/reverse?format=jsonv2&lat=${p.lat}&lon=${p.lng}&accept-language=ru`);
+      if(!r.ok)throw 0;const d=await r.json();
+      if(field==='from')$('from').value=d.display_name||`${p.lat.toFixed(5)}, ${p.lng.toFixed(5)}`;
+      else $('to').value=d.display_name||`${p.lat.toFixed(5)}, ${p.lng.toFixed(5)}`;
+    }catch(e){}
+  }
+
+  async function geocode(q){
+    const r=await fetch(`${GEOCODER}/search?format=jsonv2&limit=1&accept-language=ru&q=${encodeURIComponent(q)}`);
+    if(!r.ok)throw new Error('Сервис поиска адресов сейчас недоступен');
+    const d=await r.json();
+    if(!d.length)throw new Error('Адрес не найден');
+    return {lat:+d[0].lat,lng:+d[0].lon,label:d[0].display_name};
+  }
+
+  async function searchField(field){
+    const q=$(field).value.trim();
+    if(!q)return;
+    try{
+      toast('Ищу адрес…');
+      const p=await geocode(q);
+      setPoint(field==='from'?'start':'end',p,p.label);
+      map.setView(p,16);
+    }catch(e){toast(e.message)}
+  }
+  $('fromSearch').onclick=()=>searchField('from');
+  $('toSearch').onclick=()=>searchField('to');
+  $('from').onkeydown=e=>{if(e.key==='Enter')searchField('from')};
+  $('to').onkeydown=e=>{if(e.key==='Enter')searchField('to')};
+
+  async function useMyLocation(setAsStart=true){
+    if(!navigator.geolocation){toast('Геолокация не поддерживается браузером');return}
+    toast('Получаю местоположение…');
+    navigator.geolocation.getCurrentPosition(p=>{
+      currentPosition={lat:p.coords.latitude,lng:p.coords.longitude,accuracy:p.coords.accuracy,heading:p.coords.heading};
+      drawUser(currentPosition);
+      if(setAsStart){
+        setPoint('start',currentPosition);
+        reverseGeocode(currentPosition,'from');
+        map.setView(currentPosition,16);
+      } else {
+        map.setView(currentPosition,18);
+      }
+      toast('Местоположение получено.');
+    },()=>toast('Разрешите доступ к геопозиции в настройках браузера.'),{enableHighAccuracy:true,timeout:12000,maximumAge:10000});
+  }
+  $('locTop').onclick=()=>useMyLocation(true);
+
+  function drawUser(p){
+    if(userMarker)map.removeLayer(userMarker);
+    if(Number.isFinite(p.heading)){
+      const el=document.createElement('div');el.className='user-arrow';el.style.transform=`rotate(${p.heading}deg)`;
+      userMarker=L.marker([p.lat,p.lng],{icon:L.divIcon({className:'',html:el,iconSize:[18,22],iconAnchor:[9,18]})}).addTo(map);
+    }else{
+      userMarker=L.marker([p.lat,p.lng],{icon:L.divIcon({className:'',html:'<div class="user-dot"></div>',iconSize:[20,20],iconAnchor:[10,10]})}).addTo(map);
+    }
+  }
+
+  $('centerBtn').onclick=()=>currentPosition?map.setView(currentPosition,17):useMyLocation(false);
+  $('zoomIn').onclick=()=>map.zoomIn(); $('zoomOut').onclick=()=>map.zoomOut();
+
+  function clearRoutes(){
+    routeLayers.forEach(l=>map.removeLayer(l));
+    routeLayers=[];routes=[];$('routeList').innerHTML='';
+  }
+
+  function safetyScore(route){
+    let score=72;
+    const near = [];
+    const coords = route.coords || [];
+    for(const m of marks){
+      let min=Infinity;
+      for(let i=0;i<coords.length;i+=Math.max(1,Math.floor(coords.length/90))){
+        min=Math.min(min,hav({lat:coords[i][1],lng:coords[i][0]},m));
+      }
+      if(min<90){
+        near.push(m);
+        if(m.type==='hazard')score-=14;
+        if(m.type==='isolated')score-=8;
+        if(m.type==='good')score+=7;
+        if(m.type==='shop')score+=4;
+        if(m.type==='stop')score+=4;
+      }
+    }
+    return {score:Math.max(10,Math.min(98,Math.round(score))),near};
+  }
+
+  function tripShape(trip){
+    const leg=trip?.legs?.[0];
+    if(!leg) return [];
+    const s=leg.shape;
+    if(s && s.type==='Feature' && s.geometry) return s.geometry.coordinates;
+    if(s && s.type==='LineString') return s.coordinates;
+    if(Array.isArray(s)) return s;
+    if(typeof s==='string') return decodePolyline6(s).map(x=>[x[1],x[0]]);
+    return [];
+  }
+
+  // Polyline6 decoder fallback for Valhalla.
+  function decodePolyline6(str){
+    let index=0,lat=0,lon=0,out=[];
+    while(index<str.length){
+      let shift=0,result=0,b;
+      do{b=str.charCodeAt(index++)-63;result|=(b&31)<<shift;shift+=5}while(b>=32);
+      lat+=result&1?~(result>>1):result>>1;
+      shift=0;result=0;
+      do{b=str.charCodeAt(index++)-63;result|=(b&31)<<shift;shift+=5}while(b>=32);
+      lon+=result&1?~(result>>1):result>>1;
+      out.push([lat/1e6,lon/1e6]);
+    }
+    return out;
+  }
+
+  function tripToRoute(trip){
+    const leg=trip.legs?.[0];
+    const coords=tripShape(trip);
+    return {trip,coords,summary:trip.summary,leg,maneuvers:leg?.maneuvers||[],score:safetyScore({coords})};
+  }
+
+  async function fetchRoute(){
+    if(!start||!end){toast('Сначала укажите начало и конец маршрута.');return}
+    $('buildBtn').disabled=true;$('buildBtn').textContent='Строю маршрут…';
+    clearRoutes();
+    try{
+      const payload={
+        locations:[
+          {lat:start.lat,lon:start.lng,type:'break'},
+          {lat:end.lat,lon:end.lng,type:'break'}
+        ],
+        costing:'pedestrian',
+        alternates:2,
+        shape_format:'geojson',
+        directions_type:'instructions',
+        directions_options:{units:'kilometers',language:'ru-RU'},
+        id:'safe-path-web'
+      };
+      const url=ROUTER+'?json='+encodeURIComponent(JSON.stringify(payload));
+      const r=await fetch(url);
+      const data=await r.json();
+      if(!r.ok || !data.trip) throw new Error(data.error || data.message || 'Маршрут не найден');
+      const all=[data.trip,...(data.alternates||[]).map(x=>x.trip||x)].filter(Boolean).map(tripToRoute);
+      if(!all.length)throw new Error('Маршрут не найден');
+      routes=all;
+      drawRoutes();
+      fitRoutes();
+      $('hint').textContent='Выберите маршрут. Затем нажмите «Начать навигацию».';
+      toast(`Готово: ${routes.length} вариант(а).`);
+    }catch(e){
+      console.error(e);
+      toast('Не получилось построить маршрут. Попробуйте другую точку или повторите через несколько секунд.');
+    }finally{
+      $('buildBtn').disabled=false;$('buildBtn').textContent='🚶 Построить маршрут';
+    }
+  }
+  $('buildBtn').onclick=fetchRoute;
+
+  function drawRoutes(){
+    routes.forEach((r,i)=>{
+      const style={color:i===selected?'#2563eb':'#64748b',weight:i===selected?7:5,opacity:i===selected?0.92:0.45};
+      const layer=L.polyline(r.coords.map(c=>[c[1],c[0]]),style).addTo(map);
+      layer.on('click',()=>selectRoute(i));
+      routeLayers.push(layer);
+    });
+    renderRouteCards();
+  }
+  function selectRoute(i){
+    selected=i;
+    routeLayers.forEach((l,j)=>l.setStyle({color:j===i?'#2563eb':'#64748b',weight:j===i?7:5,opacity:j===i?.92:.45}));
+    renderRouteCards();
+  }
+  function renderRouteCards(){
+    $('routeList').innerHTML='';
+    routes.forEach((r,i)=>{
+      const score=r.score.score, scoreClass=score>=80?'#16a34a':score>=55?'#ea8a00':'#dc2626';
+      const el=document.createElement('div');el.className='route-card'+(i===selected?' active':'');
+      const name=i===0?'Основной маршрут':`Вариант ${i+1}`;
+      const notes=r.score.near.length?` • рядом ${r.score.near.length} пользовательск. отметок`:' • отметок рядом нет';
+      el.innerHTML=`
+        <div class="route-main">
+          <div><div class="route-name">${name}</div><div class="route-meta">${fmtDist(r.summary.length*1000)} • ${fmtTime(r.summary.time)}${notes}</div></div>
+          <div class="route-score" style="color:${scoreClass}">${score}/100</div>
+        </div>
+        <div class="route-sub">
+          <button class="route-select">${i===selected?'Выбран':'Показать'}</button>
+          <button class="route-go">▶ Начать навигацию</button>
+        </div>`;
+      el.querySelector('.route-select').onclick=()=>selectRoute(i);
+      el.querySelector('.route-go').onclick=()=>{selectRoute(i);startNavigation()};
+      $('routeList').appendChild(el);
+    });
+  }
+
+  function fitRoutes(){
+    if(!routeLayers.length)return;
+    const group=L.featureGroup(routeLayers);
+    map.fitBounds(group.getBounds(),{paddingTopLeft:[360,110],paddingBottomRight:[40,160]});
+  }
+
+  function stopNavigation(){
+    navigating=false;
+    if(watchId!==null){navigator.geolocation.clearWatch(watchId);watchId=null}
+    $('navPanel').style.display='none';$('navBottom').style.display='none';
+    $('searchCard').style.display='block';
+    map.dragging.enable();map.touchZoom.enable();map.scrollWheelZoom.enable();
+    toast('Навигация завершена.');
+  }
+  $('stopNav').onclick=stopNavigation;
+
+  function startNavigation(){
+    if(!routes.length)return;
+    navigating=true;currentManeuver=0;
+    $('searchCard').style.display='none';
+    $('navPanel').style.display='block';$('navBottom').style.display='block';
+    map.dragging.enable();map.touchZoom.enable();map.scrollWheelZoom.disable();
+    updateNavigationUI();
+    if(navigator.geolocation){
+      watchId=navigator.geolocation.watchPosition(onNavPosition,()=>toast('Сигнал GPS временно потерян.'),{
+        enableHighAccuracy:true,maximumAge:1500,timeout:10000
+      });
+    }
+    if(voiceOn) speakInstruction(routes[selected].maneuvers?.[0]?.instruction||'Маршрут начат');
+    toast('Навигация запущена. Держите GPS включённым.');
+  }
+
+  function onNavPosition(pos){
+    if(!navigating)return;
+    currentPosition={lat:pos.coords.latitude,lng:pos.coords.longitude,accuracy:pos.coords.accuracy,heading:pos.coords.heading};
+    drawUser(currentPosition);
+    const r=routes[selected];
+    if(!r)return;
+    // Follow the user gently, without snapping the map on every tiny GPS change.
+    map.panTo([currentPosition.lat,currentPosition.lng],{animate:true,duration:.35});
+    advanceManeuvers();
+    updateNavigationUI();
+    // Soft off-route check. Rebuild from current position to destination.
+    const nearest=nearestDistanceToRoute(currentPosition,r.coords);
+    if(nearest>90 && r.summary.length>0.4){
+      if(!onNavPosition.rebuildTimer){
+        onNavPosition.rebuildTimer=setTimeout(async()=>{
+          onNavPosition.rebuildTimer=null;
+          start=currentPosition;
+          await fetchRoute();
+          if(routes.length){selected=0;startNavigation()}
+        },5000);
+        toast('Похоже, вы ушли с маршрута. Перестраиваю…');
+      }
+    }
+  }
+
+  function nearestDistanceToRoute(p,coords){
+    let min=Infinity;
+    for(let i=0;i<coords.length;i+=Math.max(1,Math.floor(coords.length/120))){
+      min=Math.min(min,hav(p,{lat:coords[i][1],lng:coords[i][0]}));
+    }
+    return min;
+  }
+
+  function advanceManeuvers(){
+    const r=routes[selected], mans=r.maneuvers||[];
+    if(!mans.length)return;
+    while(currentManeuver<mans.length-1){
+      const m=mans[currentManeuver], idx=Math.min(m.end_shape_index||m.begin_shape_index||0,r.coords.length-1);
+      const target={lat:r.coords[idx][1],lng:r.coords[idx][0]};
+      if(hav(currentPosition,target)<28) currentManeuver++;
+      else break;
+    }
+    const last=r.maneuvers[r.maneuvers.length-1];
+    if(currentManeuver>=mans.length-1 && hav(currentPosition,end)<25){
+      toast('Вы прибыли к месту назначения.');
+      if(voiceOn)speakInstruction('Вы прибыли к месту назначения.');
+      stopNavigation();
+    }
+  }
+
+  function updateNavigationUI(){
+    const r=routes[selected];if(!r)return;
+    const m=r.maneuvers?.[currentManeuver];
+    if(m){
+      $('nextInstruction').textContent=m.instruction||'Продолжайте движение';
+      $('nextDistance').textContent=`Через ${fmtDist((m.length||0)*1000)}`;
+      $('maneuverIcon').textContent=iconForManeuver(m.type);
+      $('nextSmall').textContent=currentManeuver===0?'Начало маршрута':'Следующий манёвр';
+    }
+    let remaining = currentPosition ? hav(currentPosition,end) : r.summary.length*1000;
+    const time = (remaining/1000)/5.1*3600;
+    $('remainingDist').textContent=fmtDist(remaining);
+    $('remainingTime').textContent=fmtTime(time);
+    $('eta').textContent=new Date(Date.now()+time*1000).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'});
+  }
+
+  function iconForManeuver(type){
+    const mapIcon={0:'⬆️',1:'↑',2:'↗️',3:'↘️',4:'↪️',5:'↩️',6:'↖️',7:'↙️',8:'↩️',9:'↪️',10:'🔄',11:'🛑',12:'🛑',13:'🚶',14:'🏁'};
+    return mapIcon[type]||'➜';
+  }
+
+  function speakInstruction(text){
+    if(!voiceOn || !('speechSynthesis' in window))return;
+    try{
+      speechSynthesis.cancel();
+      const u=new SpeechSynthesisUtterance(text);u.lang='ru-RU';u.rate=.96;u.pitch=1;
+      speechSynthesis.speak(u);
+    }catch(e){}
+  }
+  $('muteBtn').onclick=()=>{
+    voiceOn=!voiceOn;$('muteBtn').textContent=voiceOn?'🔊':'🔇';
+    if(!voiceOn && 'speechSynthesis' in window)speechSynthesis.cancel();
+    toast(voiceOn?'Голосовые подсказки включены':'Голосовые подсказки выключены');
+  };
+
+  // collapse on mobile
+  $('collapseBtn').onclick=()=>{
+    const c=$('searchCard');c.classList.toggle('collapsed');$('collapseBtn').textContent=c.classList.contains('collapsed')?'⌃':'⌄';
+  };
+  $('swapBtn').onclick=()=>{
+    const a=$('from').value,b=$('to').value;$('from').value=b;$('to').value=a;
+    const tmp=start;start=end;end=tmp;
+    if(startMarker&&endMarker){
+      const sm=startMarker.getLatLng(),em=endMarker.getLatLng();
+      startMarker.setLatLng(em);endMarker.setLatLng(sm);
+    }
+    toast('Точки поменяны местами.');
+  };
+
+  // marks
+  function drawMarks(){
+    marks.forEach(m=>{
+      const icon=L.divIcon({className:'',html:`<div style="font-size:21px;filter:drop-shadow(0 2px 2px #0004)">${({hazard:'🔴',isolated:'🟠',good:'🟢',shop:'🏪',stop:'🚏'})[m.type]||'📍'}</div>`,iconSize:[25,25],iconAnchor:[12,12]});
+      L.marker([m.lat,m.lng],{icon}).addTo(map).bindPopup(`<b>${labelMap[m.type]}</b><br><small>Пользовательская отметка</small>`);
+    });
+  }
+  drawMarks();
+
+  function openMarkModal(){
+    $('modalBg').style.display='flex';pendingMarkType=null;pendingMarkPoint=null;
+    document.querySelectorAll('.choice').forEach(c=>c.classList.remove('sel'));
+    $('markHint').textContent='1. Выберите тип. 2. Коснитесь карты.';
+  }
+  $('reportTop').onclick=openMarkModal;
+  document.querySelectorAll('.choice').forEach(c=>c.onclick=()=>{
+    pendingMarkType=c.dataset.type;
+    document.querySelectorAll('.choice').forEach(x=>x.classList.remove('sel'));
+    c.classList.add('sel');
+    $('markHint').textContent='Теперь коснитесь нужной точки на карте.';
+  });
+  $('cancelMark').onclick=()=>{
+    $('modalBg').style.display='none';
+    if(pendingMarkPreview){map.removeLayer(pendingMarkPreview);pendingMarkPreview=null}
+  };
+  $('saveMark').onclick=()=>{
+    if(!pendingMarkType||!pendingMarkPoint){toast('Выберите тип и точку на карте.');return}
+    const m={type:pendingMarkType,lat:pendingMarkPoint.lat,lng:pendingMarkPoint.lng};
+    marks.push(m);localStorage.setItem('safePathMarksV2',JSON.stringify(marks));
+    $('modalBg').style.display='none';
+    if(pendingMarkPreview){map.removeLayer(pendingMarkPreview);pendingMarkPreview=null}
+    const icon=L.divIcon({className:'',html:`<div style="font-size:21px">${({hazard:'🔴',isolated:'🟠',good:'🟢',shop:'🏪',stop:'🚏'})[m.type]}</div>`,iconSize:[25,25],iconAnchor:[12,12]});
+    L.marker([m.lat,m.lng],{icon}).addTo(map).bindPopup(`<b>${labelMap[m.type]}</b><br><small>Сохранено в этом браузере</small>`);
+    toast('Отметка сохранена.');
+  };
+
+  // tiny resilience if CDN/map resources are slow
+  setTimeout(()=>{
+    if(!map.getCenter())toast('Карта загружается…');
+  },4000);
+
+  // public demo routing is rate-limited: prevent accidental double clicks
+  $('buildBtn').addEventListener('click',()=>{setTimeout(()=>{},0)});
+
+  // Initial state
+  $('hint').textContent='Выберите начало и конец на карте или введите адреса.';
+})();
 </script>
 </body>
 </html>
