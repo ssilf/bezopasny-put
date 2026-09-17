@@ -166,8 +166,10 @@ button{cursor:pointer}
     border-radius:22px 22px 0 0;padding:12px 12px calc(12px + env(safe-area-inset-bottom));overflow:auto
   }
   .search-card.collapsed{max-height:none}
-  .search-card.collapsed .point-row,.search-card.collapsed .main-actions,.search-card.collapsed .hint,.search-card.collapsed .route-list{display:none}
+  .search-card.collapsed .point-row,.search-card.collapsed .main-actions,.search-card.collapsed .location-route,.search-card.collapsed .hint,.search-card.collapsed .route-list{display:none}
   .legend-pill{display:none}
+  .modal-bg{padding:8px}
+  .modal{border-radius:22px;padding:14px}
   .map-tools{right:8px;bottom:calc(58% + 9px)}
   .nav-panel{top:8px}.nav-bottom{bottom:8px}
 }
@@ -254,7 +256,11 @@ button{cursor:pointer}
 <div class="modal-bg" id="modalBg">
   <div class="modal">
     <h2>Добавить отметку</h2>
-    <p>Выберите тип отметки и затем коснитесь нужного места на карте.</p>
+    <p>Сначала выберите тип, затем укажите место прямо на карте.</p>
+    <div class="mark-steps">
+      <div class="mark-step active" id="markStep1">1 · Тип отметки</div>
+      <div class="mark-step" id="markStep2">2 · Точка на карте</div>
+    </div>
     <div class="choices">
       <div class="choice" data-type="hazard">🔴 Плохое освещение</div>
       <div class="choice" data-type="isolated">🟠 Безлюдный участок</div>
@@ -303,6 +309,7 @@ button{cursor:pointer}
   let currentPosition=null,userMarker=null,watchId=null;
   let navigating=false,currentManeuver=0,voiceOn=true;
   let pendingMarkType=null,pendingMarkPoint=null,pendingMarkPreview=null;
+  let markPicking=false;
   let marks=JSON.parse(localStorage.getItem('safePathMarksV3')||'[]');
   let autocompleteTimer=null;
 
@@ -325,26 +332,41 @@ button{cursor:pointer}
     return 2*R*Math.asin(Math.sqrt(x));
   }
 
+  function pointIcon(letter,kind){
+    return L.divIcon({
+      className:'',
+      html:`<div class="map-point map-point-${kind}"><span>${letter}</span></div><div class="map-point-label">Точка ${letter}</div>`,
+      iconSize:[72,62],iconAnchor:[36,32],popupAnchor:[0,-30]
+    });
+  }
+
   function setPoint(which,p,label=''){
-    if(which==='start'){
+    const isStart=which==='start';
+    if(isStart){
       start=p;
       if(startMarker)map.removeLayer(startMarker);
-      startMarker=L.marker(p).addTo(map).bindPopup('<b>Начало маршрута</b>');
+      startMarker=L.marker(p,{icon:pointIcon('A','a'),zIndexOffset:900})
+        .addTo(map).bindPopup('<b>Точка A</b><br>Начало маршрута');
       $('from').value=label||`${p.lat.toFixed(5)}, ${p.lng.toFixed(5)}`;
     }else{
       end=p;
       if(endMarker)map.removeLayer(endMarker);
-      endMarker=L.marker(p).addTo(map).bindPopup('<b>Конец маршрута</b>');
+      endMarker=L.marker(p,{icon:pointIcon('B','b'),zIndexOffset:890})
+        .addTo(map).bindPopup('<b>Точка B</b><br>Конец маршрута');
       $('to').value=label||`${p.lat.toFixed(5)}, ${p.lng.toFixed(5)}`;
     }
   }
 
   map.on('click',e=>{
-    if($('modalBg').style.display==='flex' && pendingMarkType){
+    if(markPicking && pendingMarkType){
       pendingMarkPoint=e.latlng;
+      markPicking=false;
       if(pendingMarkPreview)map.removeLayer(pendingMarkPreview);
-      pendingMarkPreview=L.circleMarker(e.latlng,{radius:9,color:'#0f766e',fillColor:'#14b8a6',fillOpacity:.8}).addTo(map);
-      $('markHint').textContent='Точка выбрана. Нажмите «Сохранить».';
+      pendingMarkPreview=L.circleMarker(e.latlng,{radius:10,color:'#0f766e',fillColor:'#14b8a6',fillOpacity:.85,weight:3}).addTo(map);
+      $('markStep1').classList.remove('active');
+      $('markStep2').classList.add('active');
+      $('markHint').textContent='Точка выбрана. Проверьте её и нажмите «Сохранить».';
+      $('modalBg').style.display='flex';
       return;
     }
     if(navigating)return;
@@ -454,19 +476,37 @@ button{cursor:pointer}
   $('fromSearch').onclick=()=>searchField('from');
   $('toSearch').onclick=()=>searchField('to');
 
-  async function useMyLocation(setAsStart=true){
-    if(!navigator.geolocation){toast('Геолокация не поддерживается браузером');return}
+  function useMyLocation(setAsStart=true){
+    if(!navigator.geolocation){
+      toast('Геолокация не поддерживается браузером');
+      return Promise.reject(new Error('Геолокация не поддерживается'));
+    }
     toast('Получаю местоположение…');
-    navigator.geolocation.getCurrentPosition(pos=>{
-      currentPosition={lat:pos.coords.latitude,lng:pos.coords.longitude,accuracy:pos.coords.accuracy,heading:pos.coords.heading};
-      drawUser(currentPosition);
-      if(setAsStart){
-        setPoint('start',currentPosition);reverseGeocode(currentPosition,'from');map.setView(currentPosition,16);
-      }else map.setView(currentPosition,18);
-      toast('Местоположение получено.');
-    },()=>toast('Разрешите геолокацию в браузере.'),{enableHighAccuracy:true,timeout:12000,maximumAge:10000});
+    return new Promise((resolve,reject)=>{
+      navigator.geolocation.getCurrentPosition(pos=>{
+        currentPosition={lat:pos.coords.latitude,lng:pos.coords.longitude,accuracy:pos.coords.accuracy,heading:pos.coords.heading};
+        drawUser(currentPosition);
+        if(setAsStart){
+          setPoint('start',currentPosition);
+          reverseGeocode(currentPosition,'from');
+          map.setView(currentPosition,16);
+        }else map.setView(currentPosition,18);
+        toast('Местоположение получено.');
+        resolve(currentPosition);
+      },err=>{
+        toast('Разрешите геолокацию в браузере.');
+        reject(err);
+      },{enableHighAccuracy:true,timeout:12000,maximumAge:10000});
+    });
   }
   $('locTop').onclick=()=>useMyLocation(true);
+  $('locationRouteBtn').onclick=async()=>{
+    try{
+      await useMyLocation(true);
+      if(start&&end)fetchRoute();
+      else if(start&&!end)toast('Местоположение установлено. Теперь укажите точку B.');
+    }catch(e){}
+  };
   $('centerBtn').onclick=()=>currentPosition?map.setView([currentPosition.lat,currentPosition.lng],17):useMyLocation(false);
   $('zoomIn').onclick=()=>map.zoomIn();$('zoomOut').onclick=()=>map.zoomOut();
 
@@ -588,12 +628,24 @@ button{cursor:pointer}
     $('routeList').innerHTML='';
     routes.forEach((r,i)=>{
       const score=r.score.score,color=score>=80?'#16a34a':score>=55?'#ea8a00':'#dc2626';
+      const near=r.score.near||[];
+      const positives=near.filter(m=>['good','shop','stop'].includes(m.type)).length;
+      const negatives=near.filter(m=>['hazard','isolated'].includes(m.type)).length;
+      const details=near.length
+        ? `<ul>${near.slice(0,5).map(m=>`<li class="${['hazard','isolated'].includes(m.type)?'negative':'positive'}">${markIcon(m.type)} ${markLabel[m.type]}</li>`).join('')}</ul>`
+        : '<div style="margin-top:5px">Рядом с маршрутом пользовательских отметок нет.</div>';
       const el=document.createElement('div');el.className='route-card'+(i===selected?' active':'');
       el.innerHTML=`
         <div class="route-main">
           <div><div class="route-name">${i===0?'Основной маршрут':`Вариант ${i+1}`}</div>
-          <div class="route-meta">${fmtDist((r.summary.length||0)*1000)} • ${fmtTime(r.summary.time||0)}${r.score.near.length?' • есть отметки рядом':''}</div></div>
+          <div class="route-meta">${fmtDist((r.summary.length||0)*1000)} • ${fmtTime(r.summary.time||0)}${near.length?' • есть отметки рядом':''}</div></div>
           <div class="route-score" style="color:${color}">${score}/100</div>
+        </div>
+        <div class="score-details">
+          <b>Оценка маршрута</b> · ${score}/100
+          <div>Положительных отметок рядом: ${positives}; предупреждений: ${negatives}</div>
+          <div style="margin-top:4px">Оценка учитывает пользовательские отметки в радиусе около 90 м от маршрута.</div>
+          ${details}
         </div>
         <div class="route-sub">
           <button class="route-btn route-show">${i===selected?'Выбран':'Показать'}</button>
@@ -789,29 +841,52 @@ button{cursor:pointer}
   }
   drawSavedMarks();
 
-  $('reportTop').onclick=()=>{
-    $('modalBg').style.display='flex';pendingMarkType=null;pendingMarkPoint=null;
+  function resetMarkFlow(){
+    pendingMarkType=null;pendingMarkPoint=null;markPicking=false;
     document.querySelectorAll('.choice').forEach(c=>c.classList.remove('sel'));
-    $('markHint').textContent='Выберите тип, затем коснитесь карты.';
+    $('markStep1').classList.add('active');$('markStep2').classList.remove('active');
+    $('markHint').textContent='Выберите тип отметки.';
+  }
+
+  $('reportTop').onclick=()=>{
+    resetMarkFlow();
+    $('modalBg').style.display='flex';
   };
+
   document.querySelectorAll('.choice').forEach(c=>c.onclick=()=>{
     pendingMarkType=c.dataset.type;
+    pendingMarkPoint=null;
+    markPicking=true;
     document.querySelectorAll('.choice').forEach(x=>x.classList.remove('sel'));
-    c.classList.add('sel');$('markHint').textContent='Теперь коснитесь нужной точки на карте.';
+    c.classList.add('sel');
+    $('modalBg').style.display='none';
+    $('markHint').textContent='Теперь коснитесь нужного места на карте.';
+    toast(`Тип «${markLabel[pendingMarkType]}» выбран. Коснитесь карты.`);
   });
+
   $('cancelMark').onclick=()=>{
     $('modalBg').style.display='none';
+    markPicking=false;
+    pendingMarkType=null;pendingMarkPoint=null;
     if(pendingMarkPreview){map.removeLayer(pendingMarkPreview);pendingMarkPreview=null}
+    $('markStep1').classList.add('active');$('markStep2').classList.remove('active');
   };
+
   $('saveMark').onclick=()=>{
-    if(!pendingMarkType||!pendingMarkPoint){toast('Выберите тип и точку.');return}
+    if(!pendingMarkType){toast('Сначала выберите тип отметки.');return}
+    if(!pendingMarkPoint){toast('Теперь выберите точку на карте.');return}
     const m={type:pendingMarkType,lat:pendingMarkPoint.lat,lng:pendingMarkPoint.lng};
     marks.push(m);localStorage.setItem('safePathMarksV3',JSON.stringify(marks));
-    $('modalBg').style.display='none';
+    $('modalBg').style.display='none';markPicking=false;
     if(pendingMarkPreview){map.removeLayer(pendingMarkPreview);pendingMarkPreview=null}
-    const icon=L.divIcon({className:'',html:`<div style="font-size:21px">${markIcon(m.type)}</div>`,iconSize:[25,25],iconAnchor:[12,12]});
-    L.marker([m.lat,m.lng],{icon}).addTo(map).bindPopup(`<b>${markLabel[m.type]}</b><br><small>Сохранено в этом браузере</small>`);
-    toast('Отметка сохранена.');
+    const icon=L.divIcon({
+      className:'',
+      html:`<div style="font-size:22px;filter:drop-shadow(0 2px 2px #0004)">${markIcon(m.type)}</div>`,
+      iconSize:[28,28],iconAnchor:[14,14]
+    });
+    L.marker([m.lat,m.lng],{icon,zIndexOffset:500}).addTo(map)
+      .bindPopup(`<b>${markLabel[m.type]}</b><br><small>Сохранено в этом браузере</small>`);
+    toast('Отметка сохранена. Она учтётся в оценке маршрутов.');
   };
 })();
 </script>
