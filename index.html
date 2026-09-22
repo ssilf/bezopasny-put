@@ -19,7 +19,8 @@
 html,body,#app{height:100%;margin:0}
 body{font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--text);background:var(--bg);overflow:hidden}
 button,input{font:inherit}
-button{cursor:pointer}
+button{cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+button:disabled{opacity:.65;cursor:default}
 #app{position:relative}
 #map{position:absolute;inset:0;z-index:1;background:#dce8e6}
 
@@ -137,6 +138,11 @@ button{cursor:pointer}
   width:20px;height:20px;border-radius:50%;background:#2563eb;border:4px solid #fff;box-shadow:0 2px 12px #2563eb66;
 }
 .user-arrow{width:0;height:0;border-left:8px solid transparent;border-right:8px solid transparent;border-bottom:17px solid #2563eb;filter:drop-shadow(0 2px 2px #0004);transform-origin:50% 85%}
+
+/* Custom A/B markers: do not depend on Leaflet PNG icon files */
+.ab-marker{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;color:#fff;font-weight:900;font-size:15px;border:4px solid #fff;box-shadow:0 5px 16px #0005}
+.ab-marker.start{background:#2563eb}.ab-marker.end{background:#dc2626}
+.mark-preview{width:24px;height:24px;border-radius:50%;background:#14b8a6;border:4px solid #fff;box-shadow:0 4px 14px #0005}
 
 .leaflet-control-zoom{border:0!important;box-shadow:0 8px 20px #0002!important}
 .leaflet-control-zoom a{border:0!important;width:38px!important;height:38px!important;line-height:38px!important;color:#334155!important}
@@ -294,7 +300,15 @@ button{cursor:pointer}
   let userMarker = null, watchId = null, currentPosition = null;
   let navigating = false, currentManeuver = 0, voiceOn = true;
   let pendingMarkType = null, pendingMarkPoint = null, pendingMarkPreview = null;
-  let marks = JSON.parse(localStorage.getItem('safePathMarksV2') || '[]');
+  let marks = [];
+  try {
+    const savedMarks = JSON.parse(localStorage.getItem('safePathMarksV2') || '[]');
+    marks = Array.isArray(savedMarks) ? savedMarks : [];
+  } catch(e) {
+    localStorage.removeItem('safePathMarksV2');
+    marks = [];
+  }
+  let placingMark = false;
 
   const labelMap = {
     hazard:'Плохое освещение',
@@ -321,26 +335,39 @@ button{cursor:pointer}
   function fmtDist(m){return m<1000?`${Math.round(m)} м`:`${(m/1000).toFixed(1)} км`}
   function fmtTime(s){let m=Math.round(s/60);if(m<60)return `${m} мин`;let h=Math.floor(m/60);return `${h} ч ${m%60} мин`}
 
+  function pointIcon(kind){
+    const text = kind==='start' ? 'A' : 'B';
+    return L.divIcon({
+      className:'',
+      html:`<div class="ab-marker ${kind}">${text}</div>`,
+      iconSize:[34,34],
+      iconAnchor:[17,17],
+      popupAnchor:[0,-18]
+    });
+  }
+
   function setPoint(which,p,label=''){
     if(which==='start'){
       start=p;
       if(startMarker)map.removeLayer(startMarker);
-      startMarker=L.marker(p,{title:'Начало'}).addTo(map).bindPopup('<b>Начало маршрута</b>');
+      startMarker=L.marker(p,{title:'Начало',icon:pointIcon('start'),keyboard:false}).addTo(map).bindPopup('<b>Начало маршрута</b>');
       $('from').value=label || `${p.lat.toFixed(5)}, ${p.lng.toFixed(5)}`;
     } else {
       end=p;
       if(endMarker)map.removeLayer(endMarker);
-      endMarker=L.marker(p,{title:'Конец'}).addTo(map).bindPopup('<b>Конец маршрута</b>');
+      endMarker=L.marker(p,{title:'Конец',icon:pointIcon('end'),keyboard:false}).addTo(map).bindPopup('<b>Конец маршрута</b>');
       $('to').value=label || `${p.lat.toFixed(5)}, ${p.lng.toFixed(5)}`;
     }
   }
 
   map.on('click',e=>{
-    if($('modalBg').style.display==='flex' && pendingMarkType){
+    if(placingMark && pendingMarkType){
       pendingMarkPoint=e.latlng;
+      placingMark=false;
       if(pendingMarkPreview)map.removeLayer(pendingMarkPreview);
-      pendingMarkPreview=L.circleMarker(e.latlng,{radius:9,color:'#0f766e',fillColor:'#14b8a6',fillOpacity:.8}).addTo(map);
-      $('markHint').textContent='Точка выбрана. Нажмите «Сохранить».';
+      pendingMarkPreview=L.marker(e.latlng,{icon:L.divIcon({className:'',html:'<div class="mark-preview"></div>',iconSize:[24,24],iconAnchor:[12,12]}),interactive:false}).addTo(map);
+      $('modalBg').style.display='flex';
+      $('markHint').textContent='Точка выбрана. Нажмите «Сохранить» или выберите другой тип.';
       return;
     }
     if(navigating) return;
@@ -518,7 +545,7 @@ button{cursor:pointer}
   }
   function selectRoute(i){
     selected=i;
-    routeLayers.forEach((l,j)=>l.setStyle({color:j===i?'#2563eb':'#64748b',weight:j===i?7:5,opacity:j===i?.92:.45}));
+    routeLayers.forEach((l,j)=>l.setStyle({color:j===i?'#2563eb':'#64748b',weight:j===i?7:5,opacity:j===i?0.92:0.45}));
     renderRouteCards();
   }
   function renderRouteCards(){
@@ -667,10 +694,8 @@ button{cursor:pointer}
   $('swapBtn').onclick=()=>{
     const a=$('from').value,b=$('to').value;$('from').value=b;$('to').value=a;
     const tmp=start;start=end;end=tmp;
-    if(startMarker&&endMarker){
-      const sm=startMarker.getLatLng(),em=endMarker.getLatLng();
-      startMarker.setLatLng(em);endMarker.setLatLng(sm);
-    }
+    if(startMarker) startMarker.setLatLng(start).setIcon(pointIcon('start'));
+    if(endMarker) endMarker.setLatLng(end).setIcon(pointIcon('end'));
     toast('Точки поменяны местами.');
   };
 
@@ -684,31 +709,63 @@ button{cursor:pointer}
   drawMarks();
 
   function openMarkModal(){
-    $('modalBg').style.display='flex';pendingMarkType=null;pendingMarkPoint=null;
+    placingMark=false;
+    pendingMarkType=null;
+    pendingMarkPoint=null;
+    if(pendingMarkPreview){map.removeLayer(pendingMarkPreview);pendingMarkPreview=null}
+    $('modalBg').style.display='flex';
     document.querySelectorAll('.choice').forEach(c=>c.classList.remove('sel'));
-    $('markHint').textContent='1. Выберите тип. 2. Коснитесь карты.';
+    $('markHint').textContent='1. Выберите тип. 2. После этого коснитесь нужного места на карте.';
   }
   $('reportTop').onclick=openMarkModal;
+
   document.querySelectorAll('.choice').forEach(c=>c.onclick=()=>{
     pendingMarkType=c.dataset.type;
     document.querySelectorAll('.choice').forEach(x=>x.classList.remove('sel'));
     c.classList.add('sel');
-    $('markHint').textContent='Теперь коснитесь нужной точки на карте.';
+    pendingMarkPoint=null;
+    if(pendingMarkPreview){map.removeLayer(pendingMarkPreview);pendingMarkPreview=null}
+    placingMark=true;
+    $('modalBg').style.display='none';
+    toast('Теперь коснитесь нужного места на карте.');
   });
+
   $('cancelMark').onclick=()=>{
     $('modalBg').style.display='none';
+    placingMark=false;pendingMarkType=null;pendingMarkPoint=null;
     if(pendingMarkPreview){map.removeLayer(pendingMarkPreview);pendingMarkPreview=null}
   };
+
   $('saveMark').onclick=()=>{
-    if(!pendingMarkType||!pendingMarkPoint){toast('Выберите тип и точку на карте.');return}
+    if(!pendingMarkType){toast('Сначала выберите тип отметки.');return}
+    if(!pendingMarkPoint){
+      $('modalBg').style.display='none';
+      placingMark=true;
+      toast('Коснитесь нужного места на карте.');
+      return;
+    }
     const m={type:pendingMarkType,lat:pendingMarkPoint.lat,lng:pendingMarkPoint.lng};
-    marks.push(m);localStorage.setItem('safePathMarksV2',JSON.stringify(marks));
+    marks.push(m);
+    try{localStorage.setItem('safePathMarksV2',JSON.stringify(marks))}catch(e){}
     $('modalBg').style.display='none';
+    placingMark=false;pendingMarkType=null;pendingMarkPoint=null;
     if(pendingMarkPreview){map.removeLayer(pendingMarkPreview);pendingMarkPreview=null}
-    const icon=L.divIcon({className:'',html:`<div style="font-size:21px">${({hazard:'🔴',isolated:'🟠',good:'🟢',shop:'🏪',stop:'🚏'})[m.type]}</div>`,iconSize:[25,25],iconAnchor:[12,12]});
+    const icon=L.divIcon({className:'',html:`<div style="font-size:21px;filter:drop-shadow(0 2px 2px #0004)">${({hazard:'🔴',isolated:'🟠',good:'🟢',shop:'🏪',stop:'🚏'})[m.type]||'📍'}</div>`,iconSize:[25,25],iconAnchor:[12,12]});
     L.marker([m.lat,m.lng],{icon}).addTo(map).bindPopup(`<b>${labelMap[m.type]}</b><br><small>Сохранено в этом браузере</small>`);
     toast('Отметка сохранена.');
   };
+
+  // Click outside the modal card closes it; taps inside do not leak to the map.
+  $('modalBg').addEventListener('click',e=>{
+    if(e.target===$('modalBg')) $('cancelMark').click();
+  });
+  document.querySelector('.modal').addEventListener('click',e=>e.stopPropagation());
+
+  // Prevent map gestures from swallowing taps on interface panels on mobile.
+  [$('searchCard'),$('navPanel'),$('navBottom'),document.querySelector('.topbar'),document.querySelector('.map-tools')].forEach(el=>{
+    if(el && window.L){ L.DomEvent.disableClickPropagation(el); L.DomEvent.disableScrollPropagation(el); }
+  });
+  document.querySelectorAll('button').forEach(b=>{ if(!b.getAttribute('type')) b.setAttribute('type','button'); });
 
   // tiny resilience if CDN/map resources are slow
   setTimeout(()=>{
