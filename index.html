@@ -295,6 +295,14 @@ button:disabled{opacity:.65;cursor:default}
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 (() => {
+  if (!window.L || typeof window.L.map !== 'function') {
+    const mapEl = document.getElementById('map');
+    if (mapEl) {
+      mapEl.style.cssText = 'display:grid;place-items:center;padding:24px;text-align:center;color:#624f59;background:#fff7fa;';
+      mapEl.textContent = 'Не удалось загрузить библиотеку карты. Проверьте интернет-соединение, отключите блокировщик CDN и обновите страницу.';
+    }
+    return;
+  }
   const ROUTER = 'https://valhalla1.openstreetmap.de/route';
   const GEOCODER = 'https://nominatim.openstreetmap.org';
 
@@ -1062,3 +1070,6 @@ button:disabled{opacity:.65;cursor:default}
   // Initial state
   $('hint').textContent='Выберите начало и конец на карте или введите адреса.';
 })();
+</script>
+</body>
+</html>
