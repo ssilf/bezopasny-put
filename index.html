@@ -65,6 +65,15 @@ button:disabled{opacity:.65;cursor:default}
   padding:0 12px;outline:none;color:var(--text);font-size:14px
 }
 .point-row input:focus{border-color:#e3afc1;box-shadow:0 0 0 3px #e5a8bb33}
+
+.point-row{position:relative}
+.address-suggestions{position:absolute;left:41px;right:58px;top:calc(100% + 3px);z-index:2500;display:none;max-height:240px;overflow:auto;background:var(--map-panel);border:1px solid var(--line);border-radius:13px;box-shadow:0 12px 30px #0002;padding:4px}
+.address-suggestions.open{display:block}
+.address-suggestion{display:block;width:100%;text-align:left;border:0;border-radius:9px;background:transparent;color:var(--text);padding:10px;font-size:13px;line-height:1.35}
+.address-suggestion:hover,.address-suggestion:focus{background:var(--surface2);outline:2px solid var(--primary)}
+.address-suggestion small{display:block;color:var(--muted);font-size:11px;margin-top:3px}
+@media(max-width:849px){.address-suggestions{left:34px;right:56px;max-height:30vh}.address-suggestion{padding:12px;font-size:14px}}
+
 .mini-btn{
   height:44px;padding:0 10px;border:1px solid var(--line);background:#fff;border-radius:12px;color:#624f59
 }
@@ -216,12 +225,14 @@ button:disabled{opacity:.65;cursor:default}
 
     <div class="point-row">
       <div class="point-dot from">A</div>
-      <input id="from" placeholder="Откуда" autocomplete="off">
+      <input id="from" placeholder="Откуда" autocomplete="off" aria-autocomplete="list" aria-expanded="false" aria-controls="fromSuggestions">
+      <div class="address-suggestions" id="fromSuggestions" role="listbox" aria-label="Подсказки адреса отправления"></div>
       <button class="mini-btn" id="fromSearch">Найти</button>
     </div>
     <div class="point-row">
       <div class="point-dot to">B</div>
-      <input id="to" placeholder="Куда" autocomplete="off">
+      <input id="to" placeholder="Куда" autocomplete="off" aria-autocomplete="list" aria-expanded="false" aria-controls="toSuggestions">
+      <div class="address-suggestions" id="toSuggestions" role="listbox" aria-label="Подсказки адреса назначения"></div>
       <button class="mini-btn" id="toSearch">Найти</button>
     </div>
 
@@ -431,6 +442,67 @@ button:disabled{opacity:.65;cursor:default}
     }catch(e){}
   }
 
+  const suggestionState = {
+    from:{timer:null,controller:null,items:[],active:-1},
+    to:{timer:null,controller:null,items:[],active:-1}
+  };
+  function closeSuggestions(field){
+    const state=suggestionState[field], box=$(field+'Suggestions');
+    if(state.timer)clearTimeout(state.timer);
+    state.timer=null;
+    box.classList.remove('open');
+    box.replaceChildren();
+    $(field).setAttribute('aria-expanded','false');
+    state.active=-1;
+  }
+  function chooseSuggestion(field,item){
+    const state=suggestionState[field];
+    state.items=[];
+    closeSuggestions(field);
+    setPoint(field==='from'?'start':'end',{lat:item.lat,lng:item.lng},item.label);
+    map.setView([item.lat,item.lng],16);
+  }
+  function renderSuggestions(field,items){
+    const box=$(field+'Suggestions'), input=$(field), state=suggestionState[field];
+    state.items=items;state.active=-1;box.replaceChildren();
+    if(!items.length){closeSuggestions(field);return}
+    items.forEach((item,index)=>{
+      const button=document.createElement('button');
+      button.type='button';button.className='address-suggestion';button.setAttribute('role','option');
+      const title=document.createElement('span');title.textContent=item.label;
+      const detail=document.createElement('small');detail.textContent=item.detail||'Адрес';
+      button.append(title,detail);
+      button.addEventListener('mousedown',e=>e.preventDefault());
+      button.addEventListener('click',()=>chooseSuggestion(field,item));
+      box.appendChild(button);
+    });
+    box.classList.add('open');input.setAttribute('aria-expanded','true');
+  }
+  async function loadSuggestions(field){
+    const state=suggestionState[field],q=$(field).value.trim();
+    if(q.length<3){closeSuggestions(field);return}
+    if(state.controller)state.controller.abort();
+    const controller=new AbortController();state.controller=controller;
+    try{
+      const url=`${GEOCODER}/search?format=jsonv2&addressdetails=1&limit=6&dedupe=1&accept-language=ru&q=${encodeURIComponent(q)}`;
+      const r=await fetch(url,{signal:controller.signal,headers:{'Accept':'application/json'}});
+      if(!r.ok)throw new Error('Не удалось получить подсказки');
+      const data=await r.json();
+      if(state.controller!==controller)return;
+      const items=data.map(d=>({
+        lat:+d.lat,lng:+d.lon,label:d.display_name,
+        detail:[d.type,d.address?.city||d.address?.town||d.address?.village,d.address?.country].filter(Boolean).join(' · ')
+      })).filter(d=>Number.isFinite(d.lat)&&Number.isFinite(d.lng)&&d.label);
+      renderSuggestions(field,items);
+    }catch(e){
+      if(e.name!=='AbortError'){console.warn('Address suggestions:',e);closeSuggestions(field)}
+    }
+  }
+  function scheduleSuggestions(field){
+    const state=suggestionState[field];
+    if(state.timer)clearTimeout(state.timer);
+    state.timer=setTimeout(()=>loadSuggestions(field),350);
+  }
   async function geocode(q){
     const r=await fetch(`${GEOCODER}/search?format=jsonv2&limit=1&accept-language=ru&q=${encodeURIComponent(q)}`);
     if(!r.ok)throw new Error('Сервис поиска адресов сейчас недоступен');
@@ -442,17 +514,43 @@ button:disabled{opacity:.65;cursor:default}
   async function searchField(field){
     const q=$(field).value.trim();
     if(!q)return;
+    const state=suggestionState[field];
+    if(state.items.length){
+      const match=state.items.find(x=>x.label.toLocaleLowerCase('ru').startsWith(q.toLocaleLowerCase('ru'))) || state.items[0];
+      chooseSuggestion(field,match);return;
+    }
     try{
       toast('Ищу адрес…');
       const p=await geocode(q);
+      closeSuggestions(field);
       setPoint(field==='from'?'start':'end',p,p.label);
       map.setView(p,16);
     }catch(e){toast(e.message)}
   }
+  ['from','to'].forEach(field=>{
+    $(field).addEventListener('input',()=>scheduleSuggestions(field));
+    $(field).addEventListener('focus',()=>{if($(field).value.trim().length>=3)scheduleSuggestions(field)});
+    $(field).addEventListener('keydown',e=>{
+      const state=suggestionState[field],box=$(field+'Suggestions');
+      if(e.key==='ArrowDown'&&state.items.length){
+        e.preventDefault();state.active=Math.min(state.active+1,state.items.length-1);
+        [...box.querySelectorAll('button')].forEach((b,i)=>b.setAttribute('aria-selected',String(i===state.active)));
+      }else if(e.key==='ArrowUp'&&state.items.length){
+        e.preventDefault();state.active=Math.max(0,state.active-1);
+        [...box.querySelectorAll('button')].forEach((b,i)=>b.setAttribute('aria-selected',String(i===state.active)));
+      }else if(e.key==='Enter'){
+        e.preventDefault();
+        if(state.active>=0&&state.items[state.active])chooseSuggestion(field,state.items[state.active]);
+        else searchField(field);
+      }else if(e.key==='Escape')closeSuggestions(field);
+    });
+    $(field).addEventListener('blur',()=>setTimeout(()=>{if(!$(field+'Suggestions').contains(document.activeElement))closeSuggestions(field)},150));
+  });
+  document.addEventListener('click',e=>{
+    ['from','to'].forEach(field=>{if(!$(field+'Suggestions').contains(e.target)&&e.target!==$(field))closeSuggestions(field)});
+  });
   $('fromSearch').onclick=()=>searchField('from');
   $('toSearch').onclick=()=>searchField('to');
-  $('from').onkeydown=e=>{if(e.key==='Enter')searchField('from')};
-  $('to').onkeydown=e=>{if(e.key==='Enter')searchField('to')};
 
   async function useMyLocation(setAsStart=true){
     if(!navigator.geolocation){toast('Геолокация не поддерживается браузером');return}
