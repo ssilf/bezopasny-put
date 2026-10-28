@@ -4,11 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0b1220">
-<meta name="description" content="Безопасный путь — комфортные маршруты и поиск адресов на Яндекс Картах">
+<meta name="description" content="Безопасный путь — комфортные маршруты для вечерних прогулок">
 <title>Безопасный путь</title>
 
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css">
-<!-- Яндекс Карты API: замените оба ключа ниже на свои в разделе скриптов -->
 
 <style>
 :root{
@@ -22,10 +21,6 @@ html[data-theme='dark'] .search-card,html[data-theme='dark'] .nav-card,html[data
 html[data-theme='dark'] .point-row input,html[data-theme='dark'] .mini-btn,html[data-theme='dark'] .secondary,html[data-theme='dark'] .mute-btn,html[data-theme='dark'] .choice{background:var(--map-input);border-color:var(--line);color:var(--text)}
 html[data-theme='dark'] .stat{background:#252d3a}html[data-theme='dark'] .route-select,html[data-theme='dark'] .route-go,html[data-theme='dark'] .collapse-btn{background:#352a36;color:#f2dce7}
 html[data-theme='dark'] .leaflet-control-zoom a{background:#202735!important;color:#edf0f6!important}
-.ymaps-suggest, .ymaps-2-1-79-suggest, .ymaps-2-1-79-suggest-item{z-index:5000!important}
-.ymaps-2-1-79-suggest-item{font-size:14px!important;padding:10px!important}
-.ymaps-2-1-79-suggest-item_selected_yes{background:#f7e8ef!important}
-html[data-theme='dark'] .ymaps-2-1-79-suggest{background:#202735!important;color:#edf0f6!important}
 html[data-theme='dark'] .map-tool{background:#202735;color:#edf0f6}html[data-theme='dark'] .legend-pill{background:#202735eF}
 *{box-sizing:border-box}
 html,body,#app{height:100%;margin:0}
@@ -297,9 +292,6 @@ button:disabled{opacity:.65;cursor:default}
 <div class="toast" id="toast"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
-<!-- Нужны отдельные ключи Яндекс JavaScript API и Suggest API. Вставьте их вместо YOUR_YANDEX_... -->
-<script src="https://api-maps.yandex.ru/2.1/?apikey=YOUR_YANDEX_MAPS_API_KEY&amp;suggest_apikey=YOUR_YANDEX_SUGGEST_API_KEY&amp;lang=ru_RU"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet-plugins/3.4.0/layer/tile/Yandex.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 (() => {
@@ -308,32 +300,21 @@ button:disabled{opacity:.65;cursor:default}
 
   const map = L.map('map',{zoomControl:false,preferCanvas:true}).setView([55.7961,49.1064],13);
 
-  // Основная подложка — Яндекс Карты через официальный JS API и совместимый слой Leaflet.
-  // Если API-ключи не заданы или слой не загрузился, используем OSM как резерв.
-  const yandexKeysConfigured = !document.querySelector('script[src*="YOUR_YANDEX_MAPS_API_KEY"]');
-  let primaryLayer = null, fallbackLayer = null, tileErrors = 0;
-  if (window.L && typeof L.yandex === 'function' && yandexKeysConfigured) {
-    try {
-      primaryLayer = L.yandex('map').addTo(map);
-      primaryLayer.on('load', () => console.info('Подложка Яндекс Карт загружена'));
-      primaryLayer.on('error', () => enableFallbackMap());
-    } catch (e) { enableFallbackMap(); }
-  } else {
-    enableFallbackMap();
-  }
-  function enableFallbackMap(){
-    if (fallbackLayer) return;
-    fallbackLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
-      maxZoom:19,attribution:'© OpenStreetMap contributors'
-    }).addTo(map);
-    toast('Для Яндекс Карт добавьте API-ключи в код. Пока используется OpenStreetMap.');
-  }
-  if (primaryLayer && primaryLayer.on) {
-    primaryLayer.on('tileerror', () => {
-      tileErrors++;
-      if(tileErrors >= 3) enableFallbackMap();
-    });
-  }
+  // Main map. If the first provider has trouble, switch to Carto automatically.
+  let primaryLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+    maxZoom:19,attribution:'© OpenStreetMap contributors'
+  }).addTo(map);
+  let fallbackLayer = null, tileErrors = 0;
+  primaryLayer.on('tileerror', () => {
+    tileErrors++;
+    if(tileErrors >= 3 && !fallbackLayer){
+      fallbackLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',{
+        subdomains:'abcd',maxZoom:19,
+        attribution:'© OpenStreetMap contributors © CARTO'
+      }).addTo(map);
+      toast('Переключил слой карты на резервный источник.');
+    }
+  });
 
   const $ = id => document.getElementById(id);
   const THEME_KEY='safePathThemeV1';
@@ -451,16 +432,6 @@ button:disabled{opacity:.65;cursor:default}
   }
 
   async function geocode(q){
-    if (window.ymaps && typeof ymaps.geocode === 'function') {
-      try {
-        const result = await ymaps.geocode(q, {results: 1});
-        const obj = result.geoObjects.get(0);
-        if (obj) {
-          const coords = obj.geometry.getCoordinates();
-          return {lat:coords[0],lng:coords[1],label:obj.getAddressLine() || q};
-        }
-      } catch (e) { console.warn('Яндекс геокодер недоступен, пробую резервный поиск', e); }
-    }
     const r=await fetch(`${GEOCODER}/search?format=jsonv2&limit=1&accept-language=ru&q=${encodeURIComponent(q)}`);
     if(!r.ok)throw new Error('Сервис поиска адресов сейчас недоступен');
     const d=await r.json();
@@ -482,34 +453,6 @@ button:disabled{opacity:.65;cursor:default}
   $('toSearch').onclick=()=>searchField('to');
   $('from').onkeydown=e=>{if(e.key==='Enter')searchField('from')};
   $('to').onkeydown=e=>{if(e.key==='Enter')searchField('to')};
-
-  // Подсказки адресов Яндекса: отдельный выпадающий список для начала и конца маршрута.
-  // SuggestView автоматически заполняет поле выбранным адресом; при выборе также отмечаем точку на карте.
-  function initYandexAddressSuggestions(){
-    if (!window.ymaps || !window.ymaps.SuggestView) return;
-    ['from','to'].forEach(field=>{
-      try {
-        const suggest = new ymaps.SuggestView(field, {results: 6, offset: [0, 4], zIndex: 5000});
-        suggest.events.add('select', async event=>{
-          const item = event.get('item');
-          const query = item && (item.value || item.displayName);
-          if (!query) return;
-          try {
-            const result = await ymaps.geocode(query, {results: 1});
-            const obj = result.geoObjects.get(0);
-            if (!obj) return;
-            const coords = obj.geometry.getCoordinates();
-            const point = {lat: coords[0], lng: coords[1]};
-            const label = item.displayName || query;
-            setPoint(field === 'from' ? 'start' : 'end', point, label);
-            map.setView(point, 16);
-          } catch (err) { console.warn('Не удалось определить координаты выбранного адреса', err); }
-        });
-      } catch (err) { console.warn('Подсказки Яндекс не инициализированы', err); }
-    });
-  }
-  if (window.ymaps && typeof ymaps.ready === 'function') ymaps.ready(initYandexAddressSuggestions);
-  else window.addEventListener('load', ()=>{ if(window.ymaps && ymaps.ready) ymaps.ready(initYandexAddressSuggestions); });
 
   async function useMyLocation(setAsStart=true){
     if(!navigator.geolocation){toast('Геолокация не поддерживается браузером');return}
