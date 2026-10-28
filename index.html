@@ -19,7 +19,7 @@ html[data-theme='dark']{color-scheme:dark;--bg:#10141c;--surface:#1a202b;--surfa
 html[data-theme='dark'] body{background:var(--bg);color:var(--text)}
 html[data-theme='dark'] .search-card,html[data-theme='dark'] .nav-card,html[data-theme='dark'] .route-card,html[data-theme='dark'] .modal{background:var(--map-panel);border-color:var(--line);color:var(--text)}
 html[data-theme='dark'] .point-row input,html[data-theme='dark'] .mini-btn,html[data-theme='dark'] .secondary,html[data-theme='dark'] .mute-btn,html[data-theme='dark'] .choice{background:var(--map-input);border-color:var(--line);color:var(--text)}
-html[data-theme='dark'] .stat{background:#252d3a}html[data-theme='dark'] .route-select,html[data-theme='dark'] .route-go,html[data-theme='dark'] .collapse-btn{background:#352a36;color:#f2dce7}
+html[data-theme='dark'] .stat{background:#252d3a}html[data-theme='dark'] .route-select,html[data-theme='dark'] .route-go,html[data-theme='dark'] .collapse-btn{background:#352a36;color:#f2dce7}html[data-theme='dark'] .cancel{background:#343d4c!important;color:#f4f6fb!important;border:1px solid #4b5668!important}html[data-theme='dark'] .save{background:var(--primary)!important;color:#fff!important}
 html[data-theme='dark'] .leaflet-control-zoom a{background:#202735!important;color:#edf0f6!important}
 html[data-theme='dark'] .map-tool{background:#202735;color:#edf0f6}html[data-theme='dark'] .legend-pill{background:#202735eF}
 *{box-sizing:border-box}
@@ -75,6 +75,7 @@ button:disabled{opacity:.65;cursor:default}
 }
 .secondary{height:46px;border:1px solid var(--line);background:#fff;border-radius:14px;color:#624f59}
 .hint{font-size:11px;color:var(--muted);margin:9px 2px 0;line-height:1.35}
+.local-place-actions{display:flex;gap:7px;margin-top:9px}.local-place-actions button{flex:1;min-width:0;border:1px solid var(--line);border-radius:11px;background:var(--surface2);color:var(--text);padding:9px 7px;font-size:11px;font-weight:750}.local-place-panel{display:none;margin-top:9px;padding:9px;border:1px solid var(--line);border-radius:13px;background:var(--surface2);max-height:190px;overflow:auto}.local-place-panel.open{display:block}.local-place-row{display:flex;align-items:center;gap:7px;padding:7px 0;border-bottom:1px solid var(--line);font-size:11px}.local-place-row:last-child{border-bottom:0}.local-place-row .place-main{flex:1;min-width:0;overflow-wrap:anywhere}.local-place-row button{border:0;border-radius:8px;padding:6px 8px;background:var(--primary);color:#fff;font-size:10px;font-weight:750}.local-place-row button.place-delete{background:transparent;color:var(--muted);border:1px solid var(--line)}
 .route-list{margin-top:12px;display:grid;gap:8px}
 .route-card{
   border:1px solid var(--line);background:#fff;border-radius:15px;padding:11px 12px;transition:.18s;
@@ -230,6 +231,8 @@ button:disabled{opacity:.65;cursor:default}
       <button class="secondary" id="swapBtn" title="Поменять местами">⇅</button>
     </div>
     <div class="hint" id="hint">Можно нажать на карту: первый клик — начало, второй — конец.</div>
+    <div class="local-place-actions"><button id="saveFavoriteBtn" type="button">☆ Сохранить пункт назначения</button><button id="togglePlacesBtn" type="button">Избранное и недавние</button></div>
+    <div class="local-place-panel" id="localPlacePanel"></div>
     <div class="route-list" id="routeList"></div>
   </section>
 
@@ -277,7 +280,7 @@ button:disabled{opacity:.65;cursor:default}
 <div class="modal-bg" id="modalBg">
   <div class="modal">
     <h2>Добавить отметку</h2>
-    <p>Выберите тип и место на карте. После настройки Supabase отметка станет общей для всех посетителей.</p>
+    <p>Выберите тип отметки и укажите место на карте. После сохранения она появится на общей карте для других посетителей.</p>
     <div class="choices" id="choices">
       <div class="choice" data-type="hazard">🔴 Плохое освещение</div>
       <div class="choice" data-type="isolated">🟠 Безлюдный участок</div>
@@ -466,6 +469,45 @@ button:disabled{opacity:.65;cursor:default}
   $('from').onkeydown=e=>{if(e.key==='Enter')searchField('from')};
   $('to').onkeydown=e=>{if(e.key==='Enter')searchField('to')};
 
+  // Избранное и история хранятся только в браузере, без отправки на сервер.
+  const FAVORITES_KEY='safePathFavoritesV1', RECENTS_KEY='safePathRecentRoutesV1';
+  function readLocalList(key){try{const v=JSON.parse(localStorage.getItem(key)||'[]');return Array.isArray(v)?v:[]}catch(e){return []}}
+  let favoritePlaces=readLocalList(FAVORITES_KEY), recentRoutes=readLocalList(RECENTS_KEY);
+  function writeLocalList(key,value){try{localStorage.setItem(key,JSON.stringify(value));return true}catch(e){toast('Не удалось сохранить данные в браузере. Проверьте свободное место.');return false}}
+  function renderLocalPlaces(){
+    const panel=$('localPlacePanel');if(!panel)return;panel.innerHTML='';
+    const addSection=(heading,items,kind)=>{
+      const h=document.createElement('div');h.style.cssText='font-weight:850;margin:5px 0 3px;font-size:12px';h.textContent=heading;panel.appendChild(h);
+      if(!items.length){const empty=document.createElement('div');empty.style.cssText='font-size:11px;color:var(--muted);padding:5px 0';empty.textContent=kind==='favorite'?'Пока нет избранных мест. Найдите адрес и сохраните пункт назначения.':'Здесь появятся последние построенные маршруты.';panel.appendChild(empty);return}
+      items.forEach((item,index)=>{
+        const row=document.createElement('div');row.className='local-place-row';
+        const main=document.createElement('div');main.className='place-main';
+        const strong=document.createElement('b');strong.textContent=kind==='favorite'?item.name:(item.fromLabel+' → '+item.toLabel);main.appendChild(strong);
+        const sub=document.createElement('div');sub.style.cssText='color:var(--muted);margin-top:2px';sub.textContent=kind==='favorite'?item.label:(item.dateLabel||'Недавно');main.appendChild(sub);row.appendChild(main);
+        const use=document.createElement('button');use.type='button';use.textContent=kind==='favorite'?'Маршрут':'Повторить';use.onclick=()=>{
+          if(kind==='favorite'){setPoint('end',{lat:item.lat,lng:item.lng},item.label||item.name);map.setView([item.lat,item.lng],16);}
+          else {setPoint('start',{lat:item.from.lat,lng:item.from.lng},item.fromLabel);setPoint('end',{lat:item.to.lat,lng:item.to.lng},item.toLabel);fetchRoute();}
+          if(kind==='favorite'&&start){fetchRoute();}
+        };row.appendChild(use);
+        if(kind==='favorite'){const del=document.createElement('button');del.type='button';del.className='place-delete';del.textContent='Удалить';del.onclick=()=>{favoritePlaces.splice(index,1);writeLocalList(FAVORITES_KEY,favoritePlaces);renderLocalPlaces()};row.appendChild(del)}
+        panel.appendChild(row);
+      });
+    };
+    addSection('Избранные места',favoritePlaces,'favorite');addSection('Недавние маршруты',recentRoutes,'recent');
+    if(recentRoutes.length){const clear=document.createElement('button');clear.type='button';clear.className='place-delete';clear.style.cssText='margin-top:8px;border:1px solid var(--line);border-radius:8px;padding:7px;background:transparent;color:var(--text)';clear.textContent='Очистить историю';clear.onclick=()=>{recentRoutes=[];writeLocalList(RECENTS_KEY,recentRoutes);renderLocalPlaces()};panel.appendChild(clear)}
+  }
+  $('togglePlacesBtn').onclick=()=>{$('localPlacePanel').classList.toggle('open');renderLocalPlaces()};
+  $('saveFavoriteBtn').onclick=()=>{
+    if(!end){toast('Сначала найдите адрес назначения или выберите точку B на карте.');return}
+    const label=$('to').value.trim()||`${end.lat.toFixed(5)}, ${end.lng.toFixed(5)}`;
+    const name=prompt('Как назвать это место? Например: Дом, Работа или Учёба',label.split(',').slice(0,2).join(',').slice(0,60));
+    if(!name||!name.trim())return;
+    favoritePlaces.unshift({name:name.trim().slice(0,60),label,lat:Number(end.lat),lng:Number(end.lng)});
+    favoritePlaces=favoritePlaces.filter((v,i,a)=>a.findIndex(x=>Math.abs(x.lat-v.lat)<0.00001&&Math.abs(x.lng-v.lng)<0.00001)===i).slice(0,30);
+    writeLocalList(FAVORITES_KEY,favoritePlaces);renderLocalPlaces();$('localPlacePanel').classList.add('open');toast('Место сохранено только на этом устройстве.');
+  };
+  renderLocalPlaces();
+
   async function useMyLocation(setAsStart=true){
     if(!navigator.geolocation){toast('Геолокация не поддерживается браузером');return}
     toast('Получаю местоположение…');
@@ -528,7 +570,7 @@ button:disabled{opacity:.65;cursor:default}
     const positives=near.filter(m=>['good','shop','stop'].includes(m.type)).length;
     let explanation;
     if(!near.length) explanation='Рядом с маршрутом нет отметок. Это не означает, что маршрут безопасен — данных недостаточно.';
-    else explanation=`В радиусе 120 м: опасных отметок — ${hazards}, безлюдных участков — ${isolated}, положительных ориентиров — ${positives}. Индекс рассчитан только по этим отметкам; они могут быть неполными или устаревшими.`;
+    else explanation=`В радиусе 120 м: опасных отметок — ${hazards}, безлюдных участков — ${isolated}, положительных ориентиров — ${positives}. Оценка основана на пользовательских отметках рядом с маршрутом и не гарантирует безопасность.`;
     return {score,near,hazards,isolated,nearDanger:hazards+isolated,positive:positives,explanation};
   }
 
@@ -575,6 +617,7 @@ button:disabled{opacity:.65;cursor:default}
           {lat:end.lat,lon:end.lng,type:'break'}
         ],
         costing:'pedestrian',
+        costing_options:{pedestrian:{use_roads:0.1,use_living_streets:0.8,sidewalk_factor:0.2,alley_factor:2.0,driveway_factor:2.0}},
         alternates:2,
         shape_format:'geojson',
         directions_type:'instructions',
@@ -589,6 +632,10 @@ button:disabled{opacity:.65;cursor:default}
       if(!all.length)throw new Error('Маршрут не найден');
       routes=all;
       selected=0;
+      const fromLabel=$('from').value.trim()||`${start.lat.toFixed(5)}, ${start.lng.toFixed(5)}`;
+      const toLabel=$('to').value.trim()||`${end.lat.toFixed(5)}, ${end.lng.toFixed(5)}`;
+      recentRoutes.unshift({from:{lat:Number(start.lat),lng:Number(start.lng)},to:{lat:Number(end.lat),lng:Number(end.lng)},fromLabel,toLabel,dateLabel:new Date().toLocaleString('ru-RU',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})});
+      recentRoutes=recentRoutes.slice(0,15);writeLocalList(RECENTS_KEY,recentRoutes);renderLocalPlaces();
       drawRoutes();
       fitRoutes();
       $('hint').textContent='Выберите маршрут. Затем нажмите «Начать навигацию».';
@@ -836,13 +883,17 @@ button:disabled{opacity:.65;cursor:default}
       const confirms=votes.filter(v=>v.vote_type==='confirm').length;
       const resolved=votes.filter(v=>v.vote_type==='resolved').length;
       const myVote=votes.find(v=>v.voter_token===voterToken)?.vote_type;
-      info.textContent = `Добавлено: ${dateText}. Подтверждений: ${confirms}. Проблема устранена: ${resolved}.`;
+      info.textContent = `Добавлено: ${dateText}. Подтверждений: ${confirms}.` + (['hazard','isolated'].includes(m.type)?` Отметок об устранении: ${resolved}.`:'');
       info.style.cssText = 'font-size:11px;margin:4px 0 8px;max-width:230px';
       const actions=document.createElement('div');actions.style.cssText='display:flex;flex-wrap:wrap;gap:5px;margin:7px 0';
       const confirmBtn=document.createElement('button');confirmBtn.type='button';confirmBtn.className='mark-vote';confirmBtn.dataset.markId=String(m.id);confirmBtn.dataset.voteType='confirm';confirmBtn.textContent=myVote==='confirm'?'✓ Подтверждено':'👍 Подтверждаю';confirmBtn.disabled=!!myVote;
-      const resolvedBtn=document.createElement('button');resolvedBtn.type='button';resolvedBtn.className='mark-vote';resolvedBtn.dataset.markId=String(m.id);resolvedBtn.dataset.voteType='resolved';resolvedBtn.textContent=myVote==='resolved'?'✓ Отмечено':'Проблема устранена';resolvedBtn.disabled=!!myVote;
-      [confirmBtn,resolvedBtn].forEach(b=>b.style.cssText='border:0;border-radius:8px;padding:7px 8px;background:#e0f2fe;color:#075985;font-weight:700;cursor:pointer;font-size:11px');
-      actions.append(confirmBtn,resolvedBtn);
+      [confirmBtn].forEach(b=>b.style.cssText='border:0;border-radius:8px;padding:7px 8px;background:#e0f2fe;color:#075985;font-weight:700;cursor:pointer;font-size:11px');
+      actions.append(confirmBtn);
+      if(['hazard','isolated'].includes(m.type)){
+        const resolvedBtn=document.createElement('button');resolvedBtn.type='button';resolvedBtn.className='mark-vote';resolvedBtn.dataset.markId=String(m.id);resolvedBtn.dataset.voteType='resolved';resolvedBtn.textContent=myVote==='resolved'?'✓ Отмечено':'Проблема устранена';resolvedBtn.disabled=!!myVote;
+        resolvedBtn.style.cssText='border:0;border-radius:8px;padding:7px 8px;background:#e0f2fe;color:#075985;font-weight:700;cursor:pointer;font-size:11px';
+        actions.append(resolvedBtn);
+      }
       const del = document.createElement('button');
       del.type = 'button';
       del.className = 'delete-mark';
