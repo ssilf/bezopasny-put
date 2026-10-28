@@ -65,15 +65,6 @@ button:disabled{opacity:.65;cursor:default}
   padding:0 12px;outline:none;color:var(--text);font-size:14px
 }
 .point-row input:focus{border-color:#e3afc1;box-shadow:0 0 0 3px #e5a8bb33}
-
-.point-row{position:relative}
-.address-suggestions{position:absolute;left:41px;right:58px;top:calc(100% + 3px);z-index:2500;display:none;max-height:240px;overflow:auto;background:var(--map-panel);border:1px solid var(--line);border-radius:13px;box-shadow:0 12px 30px #0002;padding:4px}
-.address-suggestions.open{display:block}
-.address-suggestion{display:block;width:100%;text-align:left;border:0;border-radius:9px;background:transparent;color:var(--text);padding:10px;font-size:13px;line-height:1.35}
-.address-suggestion:hover,.address-suggestion:focus{background:var(--surface2);outline:2px solid var(--primary)}
-.address-suggestion small{display:block;color:var(--muted);font-size:11px;margin-top:3px}
-@media(max-width:849px){.address-suggestions{left:34px;right:56px;max-height:30vh}.address-suggestion{padding:12px;font-size:14px}}
-
 .mini-btn{
   height:44px;padding:0 10px;border:1px solid var(--line);background:#fff;border-radius:12px;color:#624f59
 }
@@ -225,14 +216,12 @@ button:disabled{opacity:.65;cursor:default}
 
     <div class="point-row">
       <div class="point-dot from">A</div>
-      <input id="from" placeholder="Откуда" autocomplete="off" aria-autocomplete="list" aria-expanded="false" aria-controls="fromSuggestions">
-      <div class="address-suggestions" id="fromSuggestions" role="listbox" aria-label="Подсказки адреса отправления"></div>
+      <input id="from" placeholder="Откуда" autocomplete="off">
       <button class="mini-btn" id="fromSearch">Найти</button>
     </div>
     <div class="point-row">
       <div class="point-dot to">B</div>
-      <input id="to" placeholder="Куда" autocomplete="off" aria-autocomplete="list" aria-expanded="false" aria-controls="toSuggestions">
-      <div class="address-suggestions" id="toSuggestions" role="listbox" aria-label="Подсказки адреса назначения"></div>
+      <input id="to" placeholder="Куда" autocomplete="off">
       <button class="mini-btn" id="toSearch">Найти</button>
     </div>
 
@@ -337,7 +326,7 @@ button:disabled{opacity:.65;cursor:default}
   let startMarker = null, endMarker = null;
   let routeLayers = [], routes = [], selected = 0;
   let userMarker = null, watchId = null, currentPosition = null;
-  let navigating = false, currentManeuver = 0, voiceOn = true;
+  let navigating = false, currentManeuver = 0, voiceOn = true, rerouteTimer = null, lastSpokenManeuver = -1;
   let pendingMarkType = null, pendingMarkPoint = null, pendingMarkPreview = null;
 
   // Заполните эти два значения из Supabase: Project URL и publishable/anon key.
@@ -350,6 +339,10 @@ button:disabled{opacity:.65;cursor:default}
   let cloudReady = false;
   let marks = [];
   let markLayers = new Map();
+  let markVotes = [];
+  const VOTER_KEY='safePathVoterV1';
+  let voterToken='';
+  try{voterToken=localStorage.getItem(VOTER_KEY)||'';if(!voterToken){voterToken=(crypto.randomUUID?crypto.randomUUID():String(Date.now())+Math.random());localStorage.setItem(VOTER_KEY,voterToken);}}catch(e){voterToken='browser-'+Math.random().toString(36).slice(2);}
 
   // Кэш нужен только для временного показа при недоступной сети.
   try {
@@ -442,67 +435,6 @@ button:disabled{opacity:.65;cursor:default}
     }catch(e){}
   }
 
-  const suggestionState = {
-    from:{timer:null,controller:null,items:[],active:-1},
-    to:{timer:null,controller:null,items:[],active:-1}
-  };
-  function closeSuggestions(field){
-    const state=suggestionState[field], box=$(field+'Suggestions');
-    if(state.timer)clearTimeout(state.timer);
-    state.timer=null;
-    box.classList.remove('open');
-    box.replaceChildren();
-    $(field).setAttribute('aria-expanded','false');
-    state.active=-1;
-  }
-  function chooseSuggestion(field,item){
-    const state=suggestionState[field];
-    state.items=[];
-    closeSuggestions(field);
-    setPoint(field==='from'?'start':'end',{lat:item.lat,lng:item.lng},item.label);
-    map.setView([item.lat,item.lng],16);
-  }
-  function renderSuggestions(field,items){
-    const box=$(field+'Suggestions'), input=$(field), state=suggestionState[field];
-    state.items=items;state.active=-1;box.replaceChildren();
-    if(!items.length){closeSuggestions(field);return}
-    items.forEach((item,index)=>{
-      const button=document.createElement('button');
-      button.type='button';button.className='address-suggestion';button.setAttribute('role','option');
-      const title=document.createElement('span');title.textContent=item.label;
-      const detail=document.createElement('small');detail.textContent=item.detail||'Адрес';
-      button.append(title,detail);
-      button.addEventListener('mousedown',e=>e.preventDefault());
-      button.addEventListener('click',()=>chooseSuggestion(field,item));
-      box.appendChild(button);
-    });
-    box.classList.add('open');input.setAttribute('aria-expanded','true');
-  }
-  async function loadSuggestions(field){
-    const state=suggestionState[field],q=$(field).value.trim();
-    if(q.length<3){closeSuggestions(field);return}
-    if(state.controller)state.controller.abort();
-    const controller=new AbortController();state.controller=controller;
-    try{
-      const url=`${GEOCODER}/search?format=jsonv2&addressdetails=1&limit=6&dedupe=1&accept-language=ru&q=${encodeURIComponent(q)}`;
-      const r=await fetch(url,{signal:controller.signal,headers:{'Accept':'application/json'}});
-      if(!r.ok)throw new Error('Не удалось получить подсказки');
-      const data=await r.json();
-      if(state.controller!==controller)return;
-      const items=data.map(d=>({
-        lat:+d.lat,lng:+d.lon,label:d.display_name,
-        detail:[d.type,d.address?.city||d.address?.town||d.address?.village,d.address?.country].filter(Boolean).join(' · ')
-      })).filter(d=>Number.isFinite(d.lat)&&Number.isFinite(d.lng)&&d.label);
-      renderSuggestions(field,items);
-    }catch(e){
-      if(e.name!=='AbortError'){console.warn('Address suggestions:',e);closeSuggestions(field)}
-    }
-  }
-  function scheduleSuggestions(field){
-    const state=suggestionState[field];
-    if(state.timer)clearTimeout(state.timer);
-    state.timer=setTimeout(()=>loadSuggestions(field),350);
-  }
   async function geocode(q){
     const r=await fetch(`${GEOCODER}/search?format=jsonv2&limit=1&accept-language=ru&q=${encodeURIComponent(q)}`);
     if(!r.ok)throw new Error('Сервис поиска адресов сейчас недоступен');
@@ -514,43 +446,17 @@ button:disabled{opacity:.65;cursor:default}
   async function searchField(field){
     const q=$(field).value.trim();
     if(!q)return;
-    const state=suggestionState[field];
-    if(state.items.length){
-      const match=state.items.find(x=>x.label.toLocaleLowerCase('ru').startsWith(q.toLocaleLowerCase('ru'))) || state.items[0];
-      chooseSuggestion(field,match);return;
-    }
     try{
       toast('Ищу адрес…');
       const p=await geocode(q);
-      closeSuggestions(field);
       setPoint(field==='from'?'start':'end',p,p.label);
       map.setView(p,16);
     }catch(e){toast(e.message)}
   }
-  ['from','to'].forEach(field=>{
-    $(field).addEventListener('input',()=>scheduleSuggestions(field));
-    $(field).addEventListener('focus',()=>{if($(field).value.trim().length>=3)scheduleSuggestions(field)});
-    $(field).addEventListener('keydown',e=>{
-      const state=suggestionState[field],box=$(field+'Suggestions');
-      if(e.key==='ArrowDown'&&state.items.length){
-        e.preventDefault();state.active=Math.min(state.active+1,state.items.length-1);
-        [...box.querySelectorAll('button')].forEach((b,i)=>b.setAttribute('aria-selected',String(i===state.active)));
-      }else if(e.key==='ArrowUp'&&state.items.length){
-        e.preventDefault();state.active=Math.max(0,state.active-1);
-        [...box.querySelectorAll('button')].forEach((b,i)=>b.setAttribute('aria-selected',String(i===state.active)));
-      }else if(e.key==='Enter'){
-        e.preventDefault();
-        if(state.active>=0&&state.items[state.active])chooseSuggestion(field,state.items[state.active]);
-        else searchField(field);
-      }else if(e.key==='Escape')closeSuggestions(field);
-    });
-    $(field).addEventListener('blur',()=>setTimeout(()=>{if(!$(field+'Suggestions').contains(document.activeElement))closeSuggestions(field)},150));
-  });
-  document.addEventListener('click',e=>{
-    ['from','to'].forEach(field=>{if(!$(field+'Suggestions').contains(e.target)&&e.target!==$(field))closeSuggestions(field)});
-  });
   $('fromSearch').onclick=()=>searchField('from');
   $('toSearch').onclick=()=>searchField('to');
+  $('from').onkeydown=e=>{if(e.key==='Enter')searchField('from')};
+  $('to').onkeydown=e=>{if(e.key==='Enter')searchField('to')};
 
   async function useMyLocation(setAsStart=true){
     if(!navigator.geolocation){toast('Геолокация не поддерживается браузером');return}
@@ -594,27 +500,28 @@ button:disabled{opacity:.65;cursor:default}
   // Оцениваем близость пользовательских отметок к линии маршрута.
   // Проверяем равномерно распределённые точки и считаем опасные отметки отдельно.
   function safetyScore(route){
-    let score=72;
-    const near=[];
-    const coords=route.coords||[];
-    if(!coords.length)return {score,near,hazards:0,isolated:0,nearDanger:0};
-    const stride=Math.max(1,Math.floor(coords.length/180));
+    // Не выдаём выдуманный балл, если возле маршрута нет пользовательских данных.
+    // Это индекс имеющихся отметок, а не объективная гарантия безопасности.
+    const near=[]; const coords=route.coords||[];
+    if(!coords.length)return {score:null,near,hazards:0,isolated:0,nearDanger:0,positive:0,explanation:'Нет геометрии маршрута для анализа отметок.'};
+    const stride=Math.max(1,Math.floor(coords.length/240));
     for(const m of marks){
       let min=Infinity;
-      for(let i=0;i<coords.length;i+=stride){
-        const c=coords[i];min=Math.min(min,hav({lat:c[1],lng:c[0]},m));
-      }
-      // Отметка учитывается, если находится в коридоре примерно 120 м от маршрута.
-      if(min<=120){near.push({...m,distanceToRoute:min});
-        if(m.type==='hazard')score-=18;
-        else if(m.type==='isolated')score-=10;
-        else if(m.type==='good')score+=6;
-        else if(m.type==='shop'||m.type==='stop')score+=3;
-      }
+      for(let i=0;i<coords.length;i+=stride){const c=coords[i];min=Math.min(min,hav({lat:c[1],lng:c[0]},m));}
+      if(min<=120)near.push({...m,distanceToRoute:min});
     }
+    const weights={hazard:3,isolated:2,good:2,shop:1,stop:1};
+    const negative=near.filter(m=>m.type==='hazard'||m.type==='isolated').reduce((n,m)=>n+(weights[m.type]||0),0);
+    const positive=near.filter(m=>['good','shop','stop'].includes(m.type)).reduce((n,m)=>n+(weights[m.type]||0),0);
+    const total=negative+positive;
+    const score=total?Math.round(100*positive/total):null;
     const hazards=near.filter(m=>m.type==='hazard').length;
     const isolated=near.filter(m=>m.type==='isolated').length;
-    return {score:Math.max(5,Math.min(98,Math.round(score))),near,hazards,isolated,nearDanger:hazards+isolated};
+    const positives=near.filter(m=>['good','shop','stop'].includes(m.type)).length;
+    let explanation;
+    if(!near.length) explanation='Рядом с маршрутом нет отметок. Это не означает, что маршрут безопасен — данных недостаточно.';
+    else explanation=`В радиусе 120 м: опасных отметок — ${hazards}, безлюдных участков — ${isolated}, положительных ориентиров — ${positives}. Индекс рассчитан только по этим отметкам; они могут быть неполными или устаревшими.`;
+    return {score,near,hazards,isolated,nearDanger:hazards+isolated,positive:positives,explanation};
   }
 
   function tripShape(trip){
@@ -716,7 +623,7 @@ button:disabled{opacity:.65;cursor:default}
   function renderRouteCards(){
     $('routeList').innerHTML='';
     routes.forEach((r,i)=>{
-      const score=r.score.score, scoreClass=score>=80?'#16a34a':score>=55?'#ea8a00':'#dc2626';
+      const score=r.score.score, scoreClass=score===null?'#64748b':score>=67?'#16a34a':score>=34?'#ea8a00':'#dc2626';
       const el=document.createElement('div');el.className='route-card'+(i===selected?' active':'');
       const tags=routeTags(r,i);
       const name=tags.length?tags.join(' · '):`Альтернативный маршрут ${i+1}`;
@@ -724,8 +631,9 @@ button:disabled{opacity:.65;cursor:default}
       el.innerHTML=`
         <div class="route-main">
           <div><div class="route-name">${name}</div><div class="route-meta">${fmtDist(r.summary.length*1000)} • ${fmtTime(r.summary.time)}${notes}</div></div>
-          <div class="route-score" style="color:${scoreClass}">${score}/100</div>
+          <div class="route-score" style="color:${scoreClass}">${score===null?'Нет данных':score+'/100'}</div>
         </div>
+        <div class="route-meta" style="white-space:normal;margin:8px 0">${r.score.explanation}</div>
         <div class="route-sub">
           <button class="route-select">${i===selected?'Выбран':'Показать'}</button>
           <button class="route-go">▶ Начать навигацию</button>
@@ -744,6 +652,8 @@ button:disabled{opacity:.65;cursor:default}
 
   function stopNavigation(){
     navigating=false;
+    if(rerouteTimer){clearTimeout(rerouteTimer);rerouteTimer=null;}
+    if('speechSynthesis' in window) speechSynthesis.cancel();
     if(watchId!==null){navigator.geolocation.clearWatch(watchId);watchId=null}
     $('navPanel').style.display='none';$('navBottom').style.display='none';
     $('searchCard').style.display='block';
@@ -754,7 +664,8 @@ button:disabled{opacity:.65;cursor:default}
 
   function startNavigation(){
     if(!routes.length)return;
-    navigating=true;currentManeuver=0;
+    if(watchId!==null){navigator.geolocation.clearWatch(watchId);watchId=null;}
+    navigating=true;currentManeuver=0;lastSpokenManeuver=-1;
     $('searchCard').style.display='none';
     $('navPanel').style.display='block';$('navBottom').style.display='block';
     map.dragging.enable();map.touchZoom.enable();map.scrollWheelZoom.disable();
@@ -764,7 +675,7 @@ button:disabled{opacity:.65;cursor:default}
         enableHighAccuracy:true,maximumAge:1500,timeout:10000
       });
     }
-    if(voiceOn) speakInstruction(routes[selected].maneuvers?.[0]?.instruction||'Маршрут начат');
+    if(voiceOn){speakInstruction(routes[selected].maneuvers?.[0]?.instruction||'Маршрут начат');lastSpokenManeuver=0;}
     toast('Навигация запущена. Держите GPS включённым.');
   }
 
@@ -781,16 +692,19 @@ button:disabled{opacity:.65;cursor:default}
     // Soft off-route check. Rebuild from current position to destination.
     const nearest=nearestDistanceToRoute(currentPosition,r.coords);
     if(nearest>90 && r.summary.length>0.4){
-      if(!onNavPosition.rebuildTimer){
-        onNavPosition.rebuildTimer=setTimeout(async()=>{
-          onNavPosition.rebuildTimer=null;
-          start=currentPosition;
+      if(!rerouteTimer){
+        rerouteTimer=setTimeout(async()=>{
+          rerouteTimer=null;
+          if(!navigating || !currentPosition)return;
+          const wasNavigating=navigating;
+          start={lat:currentPosition.lat,lng:currentPosition.lng};
           await fetchRoute();
-          if(routes.length){selected=0;startNavigation()}
+          // fetchRoute replaces the route but does not create a second GPS watcher.
+          if(wasNavigating && navigating && routes.length){selected=0;currentManeuver=0;lastSpokenManeuver=-1;updateNavigationUI();if(voiceOn){speakInstruction(routes[0].maneuvers?.[0]?.instruction||'Маршрут перестроен');lastSpokenManeuver=0;}toast('Маршрут перестроен. Продолжаем навигацию.');}
         },5000);
         toast('Похоже, вы ушли с маршрута. Перестраиваю…');
       }
-    }
+    }else if(rerouteTimer){clearTimeout(rerouteTimer);rerouteTimer=null;}
   }
 
   function nearestDistanceToRoute(p,coords){
@@ -807,8 +721,14 @@ button:disabled{opacity:.65;cursor:default}
     while(currentManeuver<mans.length-1){
       const m=mans[currentManeuver], idx=Math.min(m.end_shape_index||m.begin_shape_index||0,r.coords.length-1);
       const target={lat:r.coords[idx][1],lng:r.coords[idx][0]};
-      if(hav(currentPosition,target)<28) currentManeuver++;
-      else break;
+      if(hav(currentPosition,target)<28){
+        currentManeuver++;
+        if(voiceOn && currentManeuver!==lastSpokenManeuver){
+          const next=mans[currentManeuver];
+          if(next?.instruction) speakInstruction(next.instruction);
+          lastSpokenManeuver=currentManeuver;
+        }
+      }else break;
     }
     const last=r.maneuvers[r.maneuvers.length-1];
     if(currentManeuver>=mans.length-1 && hav(currentPosition,end)<25){
@@ -827,8 +747,19 @@ button:disabled{opacity:.65;cursor:default}
       $('maneuverIcon').textContent=iconForManeuver(m.type);
       $('nextSmall').textContent=currentManeuver===0?'Начало маршрута':'Следующий манёвр';
     }
-    let remaining = currentPosition ? hav(currentPosition,end) : r.summary.length*1000;
-    const time = (remaining/1000)/5.1*3600;
+    let remaining = r.summary.length*1000;
+    if(currentPosition && r.coords?.length>1){
+      let nearestIndex=0,nearest=Infinity;
+      const stride=Math.max(1,Math.floor(r.coords.length/500));
+      for(let i=0;i<r.coords.length;i+=stride){const c=r.coords[i];const d=hav(currentPosition,{lat:c[1],lng:c[0]});if(d<nearest){nearest=d;nearestIndex=i;}}
+      let along=0;
+      for(let i=nearestIndex+1;i<r.coords.length;i++){
+        const a=r.coords[i-1],b=r.coords[i];along+=hav({lat:a[1],lng:a[0]},{lat:b[1],lng:b[0]});
+      }
+      remaining=Math.max(0,along+nearest);
+    }
+    // 1.3 m/s ≈ обычная пешая скорость; фактическое время зависит от человека и условий.
+    const time = (remaining/1.3);
     $('remainingDist').textContent=fmtDist(remaining);
     $('remainingTime').textContent=fmtTime(time);
     $('eta').textContent=new Date(Date.now()+time*1000).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'});
@@ -891,15 +822,26 @@ button:disabled{opacity:.65;cursor:default}
       const title = document.createElement('b');
       title.textContent = labelMap[m.type] || 'Пользовательская отметка';
       const info = document.createElement('div');
-      info.textContent = 'Общая отметка для всех посетителей';
-      info.style.cssText = 'font-size:11px;margin:4px 0 8px';
+      const date=m.created_at?new Date(m.created_at):null;
+      const dateText=date&&!Number.isNaN(date.getTime())?date.toLocaleDateString('ru-RU',{day:'2-digit',month:'long',year:'numeric'}):'дата неизвестна';
+      const votes=markVotes.filter(v=>String(v.mark_id)===String(m.id));
+      const confirms=votes.filter(v=>v.vote_type==='confirm').length;
+      const resolved=votes.filter(v=>v.vote_type==='resolved').length;
+      const myVote=votes.find(v=>v.voter_token===voterToken)?.vote_type;
+      info.textContent = `Добавлено: ${dateText}. Подтверждений: ${confirms}. Проблема устранена: ${resolved}.`;
+      info.style.cssText = 'font-size:11px;margin:4px 0 8px;max-width:230px';
+      const actions=document.createElement('div');actions.style.cssText='display:flex;flex-wrap:wrap;gap:5px;margin:7px 0';
+      const confirmBtn=document.createElement('button');confirmBtn.type='button';confirmBtn.className='mark-vote';confirmBtn.dataset.markId=String(m.id);confirmBtn.dataset.voteType='confirm';confirmBtn.textContent=myVote==='confirm'?'✓ Подтверждено':'👍 Подтверждаю';confirmBtn.disabled=!!myVote;
+      const resolvedBtn=document.createElement('button');resolvedBtn.type='button';resolvedBtn.className='mark-vote';resolvedBtn.dataset.markId=String(m.id);resolvedBtn.dataset.voteType='resolved';resolvedBtn.textContent=myVote==='resolved'?'✓ Отмечено':'Проблема устранена';resolvedBtn.disabled=!!myVote;
+      [confirmBtn,resolvedBtn].forEach(b=>b.style.cssText='border:0;border-radius:8px;padding:7px 8px;background:#e0f2fe;color:#075985;font-weight:700;cursor:pointer;font-size:11px');
+      actions.append(confirmBtn,resolvedBtn);
       const del = document.createElement('button');
       del.type = 'button';
       del.className = 'delete-mark';
       del.dataset.markId = String(m.id);
       del.textContent = '🗑 Удалить отметку';
       del.style.cssText = 'border:0;border-radius:9px;padding:7px 9px;background:#f8e1e6;color:#9b4d61;font-weight:700;cursor:pointer';
-      popup.append(title, info, del);
+      popup.append(title, info, actions, del);
       marker.bindPopup(popup);
       marker.addTo(map);
       markLayers.set(String(m.id), marker);
@@ -921,6 +863,13 @@ button:disabled{opacity:.65;cursor:default}
     cacheMarks();
     drawMarks();
     return true;
+  }
+
+  async function loadMarkVotes(){
+    if(!supabaseClient){markVotes=[];return;}
+    const {data,error}=await supabaseClient.from('public_mark_votes').select('mark_id,voter_token,vote_type');
+    if(error){console.warn('Mark votes unavailable. Run the SQL migration included with this file.',error);markVotes=[];return;}
+    markVotes=data||[];
   }
 
   async function initSharedMarks(){
@@ -951,11 +900,15 @@ button:disabled{opacity:.65;cursor:default}
 
       const loaded = await loadCloudMarks(true);
       if(!loaded) return;
+      await loadMarkVotes();
+      drawMarks();
       cloudReady = true;
       if(marksChannel) await supabaseClient.removeChannel(marksChannel);
       marksChannel = supabaseClient.channel('public-marks-live')
         .on('postgres_changes', {event:'*', schema:'public', table:'public_marks'}, async ()=>{
           await loadCloudMarks(false);
+          await loadMarkVotes();
+          drawMarks();
         })
         .subscribe(status=>{
           if(status === 'SUBSCRIBED') console.info('Shared marks realtime connected');
@@ -966,6 +919,19 @@ button:disabled{opacity:.65;cursor:default}
       toast('Ошибка подключения к Supabase. Проверьте URL и ключ.');
     }
   }
+
+  // One vote per browser token per mark. The database UNIQUE constraint is the final duplicate guard.
+  document.addEventListener('click', async e=>{
+    const button=e.target.closest('.mark-vote');if(!button)return;
+    if(!cloudReady||!supabaseClient){toast('Подтверждения работают после настройки таблицы public_mark_votes в Supabase.');return;}
+    const markId=button.dataset.markId, voteType=button.dataset.voteType;
+    if(!markId||!['confirm','resolved'].includes(voteType))return;
+    if(markVotes.some(v=>String(v.mark_id)===String(markId)&&v.voter_token===voterToken)){toast('Вы уже голосовали за эту отметку.');return;}
+    button.disabled=true;
+    const {error}=await supabaseClient.from('public_mark_votes').insert({mark_id:String(markId),voter_token:voterToken,vote_type:voteType});
+    if(error){console.error('Mark vote error:',error);button.disabled=false;toast(error.code==='23505'?'Ваш голос уже учтён.':'Не удалось сохранить голос. Проверьте SQL-настройку Supabase.');return;}
+    await loadMarkVotes();drawMarks();toast(voteType==='confirm'?'Отметка подтверждена.':'Отмечено, что проблема устранена.');
+  });
 
   // Deletion is intentionally public as requested: any visitor can delete any mark.
   document.addEventListener('click', async e=>{
@@ -1096,6 +1062,3 @@ button:disabled{opacity:.65;cursor:default}
   // Initial state
   $('hint').textContent='Выберите начало и конец на карте или введите адреса.';
 })();
-</script>
-</body>
-</html>
