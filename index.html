@@ -528,7 +528,7 @@ button:disabled{opacity:.65;cursor:default}
     const positives=near.filter(m=>['good','shop','stop'].includes(m.type)).length;
     let explanation;
     if(!near.length) explanation='Рядом с маршрутом нет отметок. Это не означает, что маршрут безопасен — данных недостаточно.';
-    else explanation=`В радиусе 120 м: опасных отметок — ${hazards}, безлюдных участков — ${isolated}, положительных ориентиров — ${positives}. Оценка основана на пользовательских отметках рядом с маршрутом и не гарантирует безопасность.`;
+    else explanation=`В радиусе 120 м: опасных отметок — ${hazards}, безлюдных участков — ${isolated}, положительных ориентиров — ${positives}.`;
     return {score,near,hazards,isolated,nearDanger:hazards+isolated,positive:positives,explanation};
   }
 
@@ -838,15 +838,15 @@ button:disabled{opacity:.65;cursor:default}
       const votes=markVotes.filter(v=>String(v.mark_id)===String(m.id));
       const confirms=votes.filter(v=>v.vote_type==='confirm').length;
       const resolved=votes.filter(v=>v.vote_type==='resolved').length;
-      const myVote=votes.find(v=>v.voter_token===voterToken)?.vote_type;
+      const myVotes=new Set(votes.filter(v=>v.voter_token===voterToken).map(v=>v.vote_type));
       info.textContent = `Добавлено: ${dateText}. Подтверждений: ${confirms}.` + (['hazard','isolated'].includes(m.type)?` Отметок об устранении: ${resolved}.`:'');
       info.style.cssText = 'font-size:11px;margin:4px 0 8px;max-width:230px';
       const actions=document.createElement('div');actions.style.cssText='display:flex;flex-wrap:wrap;gap:5px;margin:7px 0';
-      const confirmBtn=document.createElement('button');confirmBtn.type='button';confirmBtn.className='mark-vote';confirmBtn.dataset.markId=String(m.id);confirmBtn.dataset.voteType='confirm';confirmBtn.textContent=myVote==='confirm'?'✓ Подтверждено':'👍 Подтверждаю';confirmBtn.disabled=!!myVote;
+      const confirmBtn=document.createElement('button');confirmBtn.type='button';confirmBtn.className='mark-vote';confirmBtn.dataset.markId=String(m.id);confirmBtn.dataset.voteType='confirm';confirmBtn.textContent=myVotes.has('confirm')?'✓ Подтверждено':'👍 Подтверждаю';confirmBtn.disabled=myVotes.has('confirm');
       [confirmBtn].forEach(b=>b.style.cssText='border:0;border-radius:8px;padding:7px 8px;background:#e0f2fe;color:#075985;font-weight:700;cursor:pointer;font-size:11px');
       actions.append(confirmBtn);
       if(['hazard','isolated'].includes(m.type)){
-        const resolvedBtn=document.createElement('button');resolvedBtn.type='button';resolvedBtn.className='mark-vote';resolvedBtn.dataset.markId=String(m.id);resolvedBtn.dataset.voteType='resolved';resolvedBtn.textContent=myVote==='resolved'?'✓ Отмечено':'Проблема устранена';resolvedBtn.disabled=!!myVote;
+        const resolvedBtn=document.createElement('button');resolvedBtn.type='button';resolvedBtn.className='mark-vote';resolvedBtn.dataset.markId=String(m.id);resolvedBtn.dataset.voteType='resolved';resolvedBtn.textContent=myVotes.has('resolved')?'✓ Отмечено':'Проблема устранена';resolvedBtn.disabled=myVotes.has('resolved');
         resolvedBtn.style.cssText='border:0;border-radius:8px;padding:7px 8px;background:#e0f2fe;color:#075985;font-weight:700;cursor:pointer;font-size:11px';
         actions.append(resolvedBtn);
       }
@@ -935,13 +935,13 @@ button:disabled{opacity:.65;cursor:default}
     }
   }
 
-  // One vote per browser token per mark. The database UNIQUE constraint is the final duplicate guard.
+  // Один голос каждого типа на отметку для каждого браузерного токена. Уникальность проверяется и базой данных.
   document.addEventListener('click', async e=>{
     const button=e.target.closest('.mark-vote');if(!button)return;
     if(!cloudReady||!supabaseClient){toast('Подтверждения работают после настройки таблицы public_mark_votes в Supabase.');return;}
     const markId=button.dataset.markId, voteType=button.dataset.voteType;
     if(!markId||!['confirm','resolved'].includes(voteType))return;
-    if(markVotes.some(v=>String(v.mark_id)===String(markId)&&v.voter_token===voterToken)){toast('Вы уже голосовали за эту отметку.');return;}
+    if(markVotes.some(v=>String(v.mark_id)===String(markId)&&v.voter_token===voterToken&&v.vote_type===voteType)){toast('Вы уже отправляли этот тип голоса за отметку.');return;}
     button.disabled=true;
     const {error}=await supabaseClient.from('public_mark_votes').insert({mark_id:String(markId),voter_token:voterToken,vote_type:voteType});
     if(error){console.error('Mark vote error:',error);button.disabled=false;toast(error.code==='23505'?'Ваш голос уже учтён.':'Не удалось сохранить голос. Проверьте SQL-настройку Supabase.');return;}
