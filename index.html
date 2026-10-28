@@ -254,7 +254,7 @@ button:disabled{opacity:.65;cursor:default}
 <div class="modal-bg" id="modalBg">
   <div class="modal">
     <h2>Добавить отметку</h2>
-    <p>Выберите тип и нажмите на нужное место карты. Пока отметки сохраняются только в этом браузере.</p>
+    <p>Выберите тип и место на карте. После настройки Supabase отметка станет общей для всех посетителей.</p>
     <div class="choices" id="choices">
       <div class="choice" data-type="hazard">🔴 Плохое освещение</div>
       <div class="choice" data-type="isolated">🟠 Безлюдный участок</div>
@@ -269,6 +269,7 @@ button:disabled{opacity:.65;cursor:default}
 <div class="toast" id="toast"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 (() => {
   const ROUTER = 'https://valhalla1.openstreetmap.de/route';
@@ -299,13 +300,31 @@ button:disabled{opacity:.65;cursor:default}
   let userMarker = null, watchId = null, currentPosition = null;
   let navigating = false, currentManeuver = 0, voiceOn = true;
   let pendingMarkType = null, pendingMarkPoint = null, pendingMarkPreview = null;
+
+  // Заполните эти два значения из Supabase: Project URL и publishable/anon key.
+  // Никогда не вставляйте сюда service_role/secret key.
+  const SUPABASE_URL = 'https://ckkluwbntbygxoymmumk.supabase.co';
+  const SUPABASE_ANON_KEY = 'sb_publishable_EgBpSx3O_n0Ucd2lKBqi4A_E0cu0y3l';
+  const MARKS_STORAGE_KEY = 'safePathMarksV2';
+  let supabaseClient = null;
+  let marksChannel = null;
+  let cloudReady = false;
   let marks = [];
+  let markLayers = new Map();
+
+  // Кэш нужен только для временного показа при недоступной сети.
   try {
-    const savedMarks = JSON.parse(localStorage.getItem('safePathMarksV2') || '[]');
-    marks = Array.isArray(savedMarks) ? savedMarks : [];
+    const cachedMarks = JSON.parse(localStorage.getItem(MARKS_STORAGE_KEY) || '[]');
+    marks = Array.isArray(cachedMarks) ? cachedMarks : [];
   } catch(e) {
-    localStorage.removeItem('safePathMarksV2');
     marks = [];
+  }
+  // Snapshot of marks saved by an older local-only version; migrate them only if cloud DB is empty.
+  const initialCachedMarks = marks.map(m=>({
+    type:m.type, lat:Number(m.lat), lng:Number(m.lng)
+  })).filter(m=>labelMapSafeType(m.type) && Number.isFinite(m.lat) && Number.isFinite(m.lng));
+  function labelMapSafeType(type){
+    return ['hazard','isolated','good','shop','stop'].includes(type);
   }
   let placingMark = false;
 
@@ -698,14 +717,137 @@ button:disabled{opacity:.65;cursor:default}
     toast('Точки поменяны местами.');
   };
 
-  // marks
-  function drawMarks(){
-    marks.forEach(m=>{
-      const icon=L.divIcon({className:'',html:`<div style="font-size:21px;filter:drop-shadow(0 2px 2px #0004)">${({hazard:'🔴',isolated:'🟠',good:'🟢',shop:'🏪',stop:'🚏'})[m.type]||'📍'}</div>`,iconSize:[25,25],iconAnchor:[12,12]});
-      L.marker([m.lat,m.lng],{icon}).addTo(map).bindPopup(`<b>${labelMap[m.type]}</b><br><small>Пользовательская отметка</small>`);
+  // Shared marks: Supabase is the source of truth; localStorage is only a cache.
+  function cacheMarks(){
+    try { localStorage.setItem(MARKS_STORAGE_KEY, JSON.stringify(marks)); } catch(e) {}
+  }
+
+  function markIcon(type){
+    const emoji = ({hazard:'🔴',isolated:'🟠',good:'🟢',shop:'🏪',stop:'🚏'})[type] || '📍';
+    return L.divIcon({
+      className:'',
+      html:`<div style="font-size:21px;filter:drop-shadow(0 2px 2px #0004)">${emoji}</div>`,
+      iconSize:[25,25],
+      iconAnchor:[12,12]
     });
   }
+
+  function drawMarks(){
+    markLayers.forEach(layer => map.removeLayer(layer));
+    markLayers.clear();
+
+    marks.forEach(m=>{
+      if(!Number.isFinite(Number(m.lat)) || !Number.isFinite(Number(m.lng))) return;
+      const marker = L.marker([Number(m.lat),Number(m.lng)],{icon:markIcon(m.type)});
+      const popup = document.createElement('div');
+      const title = document.createElement('b');
+      title.textContent = labelMap[m.type] || 'Пользовательская отметка';
+      const info = document.createElement('div');
+      info.textContent = 'Общая отметка для всех посетителей';
+      info.style.cssText = 'font-size:11px;margin:4px 0 8px';
+      const del = document.createElement('button');
+      del.type = 'button';
+      del.className = 'delete-mark';
+      del.dataset.markId = String(m.id);
+      del.textContent = '🗑 Удалить отметку';
+      del.style.cssText = 'border:0;border-radius:9px;padding:7px 9px;background:#f8e1e6;color:#9b4d61;font-weight:700;cursor:pointer';
+      popup.append(title, info, del);
+      marker.bindPopup(popup);
+      marker.addTo(map);
+      markLayers.set(String(m.id), marker);
+    });
+  }
+
+  async function loadCloudMarks(showMessage=false){
+    if(!supabaseClient) return false;
+    const {data, error} = await supabaseClient
+      .from('public_marks')
+      .select('id,type,lat,lng,created_at')
+      .order('created_at', {ascending:true});
+    if(error){
+      console.error('Supabase load error:', error);
+      if(showMessage) toast('Не удалось загрузить общие отметки. Проверьте настройки Supabase.');
+      return false;
+    }
+    marks = (data || []).map(m=>({...m,lat:Number(m.lat),lng:Number(m.lng)}));
+    cacheMarks();
+    drawMarks();
+    return true;
+  }
+
+  async function initSharedMarks(){
+    const configured = SUPABASE_URL.startsWith('https://')
+      && !SUPABASE_URL.includes('ВСТАВЬТЕ_')
+      && SUPABASE_ANON_KEY.length > 20
+      && !SUPABASE_ANON_KEY.includes('ВСТАВЬТЕ_');
+    if(!configured || !window.supabase?.createClient){
+      drawMarks();
+      toast('Пока показаны локальные отметки. Добавьте ключи Supabase в код для общей базы.');
+      return;
+    }
+
+    try{
+      supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+      // If the new cloud table is empty, carry over this browser's old local marks once.
+      const {count, error:countError} = await supabaseClient
+        .from('public_marks')
+        .select('id', {count:'exact', head:true});
+      if(countError) throw countError;
+      if(count === 0 && initialCachedMarks.length){
+        const {error:migrateError} = await supabaseClient
+          .from('public_marks')
+          .insert(initialCachedMarks);
+        if(migrateError) throw migrateError;
+      }
+
+      const loaded = await loadCloudMarks(true);
+      if(!loaded) return;
+      cloudReady = true;
+      if(marksChannel) await supabaseClient.removeChannel(marksChannel);
+      marksChannel = supabaseClient.channel('public-marks-live')
+        .on('postgres_changes', {event:'*', schema:'public', table:'public_marks'}, async ()=>{
+          await loadCloudMarks(false);
+        })
+        .subscribe(status=>{
+          if(status === 'SUBSCRIBED') console.info('Shared marks realtime connected');
+        });
+      toast('Общие отметки загружены.');
+    }catch(e){
+      console.error('Supabase initialization error:', e);
+      toast('Ошибка подключения к Supabase. Проверьте URL и ключ.');
+    }
+  }
+
+  // Deletion is intentionally public as requested: any visitor can delete any mark.
+  document.addEventListener('click', async e=>{
+    const button = e.target.closest('.delete-mark');
+    if(!button) return;
+    const id = button.dataset.markId;
+    if(!id) return;
+    if(!confirm('Удалить эту общую отметку для всех посетителей?')) return;
+
+    button.disabled = true;
+    if(cloudReady && supabaseClient){
+      const {error} = await supabaseClient.from('public_marks').delete().eq('id', id);
+      if(error){
+        console.error('Supabase delete error:', error);
+        button.disabled = false;
+        toast('Не удалось удалить отметку. Проверьте правила доступа.');
+        return;
+      }
+      await loadCloudMarks(false);
+      toast('Отметка удалена у всех посетителей.');
+    }else{
+      marks = marks.filter(m=>String(m.id)!==String(id));
+      cacheMarks();
+      drawMarks();
+      toast('Удалено только локально. Сначала настройте Supabase для общей базы.');
+    }
+  });
+
   drawMarks();
+  initSharedMarks();
 
   function openMarkModal(){
     placingMark=false;
@@ -735,7 +877,7 @@ button:disabled{opacity:.65;cursor:default}
     if(pendingMarkPreview){map.removeLayer(pendingMarkPreview);pendingMarkPreview=null}
   };
 
-  $('saveMark').onclick=()=>{
+  $('saveMark').onclick=async ()=>{
     if(!pendingMarkType){toast('Сначала выберите тип отметки.');return}
     if(!pendingMarkPoint){
       $('modalBg').style.display='none';
@@ -743,15 +885,44 @@ button:disabled{opacity:.65;cursor:default}
       toast('Коснитесь нужного места на карте.');
       return;
     }
-    const m={type:pendingMarkType,lat:pendingMarkPoint.lat,lng:pendingMarkPoint.lng};
-    marks.push(m);
-    try{localStorage.setItem('safePathMarksV2',JSON.stringify(marks))}catch(e){}
-    $('modalBg').style.display='none';
-    placingMark=false;pendingMarkType=null;pendingMarkPoint=null;
-    if(pendingMarkPreview){map.removeLayer(pendingMarkPreview);pendingMarkPreview=null}
-    const icon=L.divIcon({className:'',html:`<div style="font-size:21px;filter:drop-shadow(0 2px 2px #0004)">${({hazard:'🔴',isolated:'🟠',good:'🟢',shop:'🏪',stop:'🚏'})[m.type]||'📍'}</div>`,iconSize:[25,25],iconAnchor:[12,12]});
-    L.marker([m.lat,m.lng],{icon}).addTo(map).bindPopup(`<b>${labelMap[m.type]}</b><br><small>Сохранено в этом браузере</small>`);
-    toast('Отметка сохранена.');
+
+    const newMark = {
+      type: pendingMarkType,
+      lat: Number(pendingMarkPoint.lat),
+      lng: Number(pendingMarkPoint.lng)
+    };
+
+    $('saveMark').disabled = true;
+    try{
+      if(cloudReady && supabaseClient){
+        const {data, error} = await supabaseClient
+          .from('public_marks')
+          .insert(newMark)
+          .select('id,type,lat,lng,created_at')
+          .single();
+        if(error) throw error;
+        marks.push({...data,lat:Number(data.lat),lng:Number(data.lng)});
+        cacheMarks();
+        drawMarks();
+        toast('Отметка добавлена для всех посетителей.');
+      }else{
+        // Local fallback works while the cloud database has not yet been configured.
+        newMark.id = (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random());
+        marks.push(newMark);
+        cacheMarks();
+        drawMarks();
+        toast('Сохранено только в этом браузере: сначала настройте Supabase.');
+      }
+
+      $('modalBg').style.display='none';
+      placingMark=false;pendingMarkType=null;pendingMarkPoint=null;
+      if(pendingMarkPreview){map.removeLayer(pendingMarkPreview);pendingMarkPreview=null}
+    }catch(e){
+      console.error('Supabase insert error:', e);
+      toast('Не удалось сохранить общую отметку. Проверьте подключение и правила Supabase.');
+    }finally{
+      $('saveMark').disabled = false;
+    }
   };
 
   // Click outside the modal card closes it; taps inside do not leak to the map.
