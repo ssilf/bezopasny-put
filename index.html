@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#c77d98">
+<meta name="theme-color" content="#0b1220">
 <meta name="description" content="Безопасный путь — комфортные маршруты для вечерних прогулок">
 <title>Безопасный путь</title>
 
@@ -71,7 +71,7 @@ button:disabled{opacity:.65;cursor:default}
 .main-actions{display:grid;grid-template-columns:1fr auto;gap:8px;margin-top:10px}
 .primary{
   height:46px;border:0;border-radius:14px;background:linear-gradient(135deg,var(--primary),var(--primary2));
-  color:#fff;font-weight:800;box-shadow:0 8px 20px rgba(181,111,145,.22)
+  color:#fff;font-weight:800;box-shadow:0 8px 20px #0f766e2e
 }
 .secondary{height:46px;border:1px solid var(--line);background:#fff;border-radius:14px;color:#624f59}
 .hint{font-size:11px;color:var(--muted);margin:9px 2px 0;line-height:1.35}
@@ -192,98 +192,6 @@ button:disabled{opacity:.65;cursor:default}
   .topbar{left:8px;right:8px;top:calc(8px + env(safe-area-inset-top))}.brand{padding:9px 10px}.brand b{font-size:13px}.search-head h1{font-size:17px}.top-actions{gap:4px}.icon-btn{width:40px;height:42px;border-radius:12px}.point-row{grid-template-columns:28px minmax(0,1fr) auto;gap:6px}.point-dot{width:26px;height:26px}.mini-btn{padding:0 8px}
 }
 @media (min-width:850px){.mobile-bar{display:none!important}}
-
-
-/* Gentle rose UI polish: decorative only; does not change map or routing logic */
-:root{--shadow:0 12px 34px rgba(181,111,145,.16)}
-html{scroll-behavior:smooth}
-.brand,.icon-btn,.search-card,.nav-instruction,.nav-bottom,.mobile-bar,.modal,.legend-pill,.map-tools{
-  -webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px)
-}
-.brand{background:rgba(111,82,96,.91);border-color:rgba(255,255,255,.2)}
-.primary{box-shadow:0 7px 18px rgba(181,111,145,.22);transition:background .2s ease,box-shadow .2s ease,transform .2s ease}
-.secondary,.mini-btn,.icon-btn,.collapse-btn,.route-select,.route-go,.map-tool,.mobile-bar button,.modal-actions button,.choice{
-  transition:transform .18s ease,box-shadow .18s ease,background-color .18s ease,border-color .18s ease,filter .18s ease
-}
-.search-card{animation:rosePanelIn .38s cubic-bezier(.2,.75,.25,1) both}
-.nav-instruction{animation:rosePanelIn .28s ease-out both}
-.route-card{animation:roseCardIn .32s ease both;box-shadow:0 2px 8px rgba(181,111,145,.035)}
-.route-card:nth-child(2){animation-delay:.035s}.route-card:nth-child(3){animation-delay:.07s}.route-card:nth-child(4){animation-delay:.105s}
-.point-row input,.choice,.modal,.stat{transition:border-color .18s ease,box-shadow .18s ease,background-color .18s ease}
-.point-row input:focus{box-shadow:0 0 0 3px rgba(199,125,152,.18)}
-button:focus-visible{outline:3px solid rgba(199,125,152,.48);outline-offset:2px}
-@media(hover:hover) and (pointer:fine){
-  .primary:hover{transform:translateY(-1px);box-shadow:0 10px 23px rgba(181,111,145,.28);filter:saturate(1.04)}
-  .secondary:hover,.mini-btn:hover,.icon-btn:hover,.collapse-btn:hover,.route-select:hover,.route-go:hover,.map-tool:hover,.modal-actions button:hover,.choice:hover{transform:translateY(-1px);box-shadow:0 5px 14px rgba(181,111,145,.14)}
-  .route-card:hover{border-color:#e5b7c9;box-shadow:0 7px 18px rgba(181,111,145,.10)}
-}
-button:active{transform:scale(.98)}
-.user-dot{animation:softUserPulse 2.8s ease-in-out infinite}
-.leaflet-marker-icon,.leaflet-marker-shadow{transition:filter .18s ease}
-html[data-theme='dark'] .brand{background:rgba(44,36,47,.94)}
-html[data-theme='dark'] .primary{box-shadow:0 7px 18px rgba(0,0,0,.2)}
-@keyframes rosePanelIn{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:translateY(0)}}
-@keyframes roseCardIn{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
-@keyframes softUserPulse{0%,100%{box-shadow:0 2px 10px rgba(181,111,145,.32)}50%{box-shadow:0 2px 14px rgba(181,111,145,.52)}}
-@media(max-width:849px){
-  .search-card{box-shadow:0 -8px 30px rgba(150,90,115,.12)}
-  .mobile-bar button{min-width:0}
-  .mobile-bar button:active{background:rgba(199,125,152,.12)}
-  .search-card,.modal{overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
-  .primary,.secondary,.mini-btn,.route-select,.route-go,.modal-actions button{min-height:44px}
-}
-@media(min-width:850px){
-  .search-card{max-height:calc(100vh - 108px);overflow-y:auto;overscroll-behavior:contain}
-  .search-card::-webkit-scrollbar,.modal::-webkit-scrollbar{width:7px}
-  .search-card::-webkit-scrollbar-thumb,.modal::-webkit-scrollbar-thumb{background:rgba(199,125,152,.3);border-radius:20px}
-}
-@media(prefers-reduced-motion:reduce){
-  *,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
-}
-
-
-
-/* Visible but gentle interaction feedback */
-button,.icon-btn,.map-tool,.mobile-bar button,.route-card,.search-card,.nav-card,.modal,.choice {
-  -webkit-tap-highlight-color: transparent;
-}
-button,.icon-btn,.map-tool,.mobile-bar button,.route-select,.route-go,.mini-btn,.secondary,.primary,.collapse-btn,.modal-actions button,.stop-btn,.mute-btn,.choice {
-  transition: transform .16s ease, box-shadow .18s ease, background-color .18s ease, border-color .18s ease, filter .18s ease;
-}
-button:active,.icon-btn:active,.map-tool:active,.mobile-bar button:active {
-  transform: scale(.965);
-  filter: brightness(.97);
-}
-button.tap-animate {
-  animation: gentleTapFeedback .42s ease-out;
-}
-.route-card, .stat, .nav-card { animation: gentleFadeUp .34s ease both; }
-.route-card:nth-child(2) { animation-delay: .04s; }
-.route-card:nth-child(3) { animation-delay: .08s; }
-.route-card:nth-child(4) { animation-delay: .12s; }
-.icon-btn:hover,.map-tool:hover,.mini-btn:hover,.secondary:hover,.route-select:hover,.route-go:hover,.collapse-btn:hover,.modal-actions button:hover,.choice:hover {
-  box-shadow: 0 4px 12px rgba(181,111,145,.16);
-}
-.primary:hover { filter: brightness(1.025); box-shadow: 0 5px 15px rgba(181,111,145,.20); }
-button:focus-visible,input:focus-visible { outline: 2px solid rgba(199,125,152,.7); outline-offset: 2px; }
-@keyframes gentleTapFeedback {
-  0% { transform: scale(1); }
-  35% { transform: scale(.965); }
-  70% { transform: scale(1.012); }
-  100% { transform: scale(1); }
-}
-@keyframes gentleFadeUp {
-  from { opacity: .65; transform: translateY(5px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-@media (hover: none) {
-  button:active,.icon-btn:active,.map-tool:active,.mobile-bar button:active { background-color: rgba(199,125,152,.12); }
-}
-@media (prefers-reduced-motion: reduce) {
-  button.tap-animate,.route-card,.stat,.nav-card { animation: none !important; }
-  button,.icon-btn,.map-tool,.mobile-bar button { transition: none !important; }
-}
-
 </style>
 </head>
 
@@ -1169,20 +1077,6 @@ button:focus-visible,input:focus-visible { outline: 2px solid rgba(199,125,152,.
   // Initial state
   $('hint').textContent='Выберите начало и конец на карте или введите адреса.';
 })();
-
-
-  // Gentle tap feedback for mouse, touch and keyboard without changing button actions.
-  document.addEventListener('click', function (event) {
-    const button = event.target.closest('button');
-    if (!button || button.disabled) return;
-    button.classList.remove('tap-animate');
-    // Force a style recalculation so repeated clicks replay the feedback animation.
-    void button.offsetWidth;
-    button.classList.add('tap-animate');
-  }, true);
-  document.addEventListener('animationend', function (event) {
-    if (event.animationName === 'gentleTapFeedback') event.target.classList.remove('tap-animate');
-  }, true);
 </script>
 </body>
 </html>
