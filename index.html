@@ -1096,17 +1096,48 @@ html[data-theme='dark']{--bg:#17121a;--surface:#211923;--surface2:#2b202a;--text
     }
   }
 
-  // One vote per browser token per mark. The database UNIQUE constraint is the final duplicate guard.
+  // One vote per browser token per mark. Lock BOTH actions immediately after either is chosen.
+  // The database UNIQUE constraint remains the final duplicate guard.
+  const votesInFlight = new Set();
   document.addEventListener('click', async e=>{
     const button=e.target.closest('.mark-vote');if(!button)return;
-    if(!cloudReady||!supabaseClient){toast('Подтверждения работают после настройки таблицы public_mark_votes в Supabase.');return;}
+    e.preventDefault();
     const markId=button.dataset.markId, voteType=button.dataset.voteType;
     if(!markId||!['confirm','resolved'].includes(voteType))return;
-    if(markVotes.some(v=>String(v.mark_id)===String(markId)&&v.voter_token===voterToken)){toast('Вы уже голосовали за эту отметку.');return;}
-    button.disabled=true;
-    const {error}=await supabaseClient.from('public_mark_votes').insert({mark_id:String(markId),voter_token:voterToken,vote_type:voteType});
-    if(error){console.error('Mark vote error:',error);button.disabled=false;toast(error.code==='23505'?'Ваш голос уже учтён.':'Не удалось сохранить голос. Проверьте SQL-настройку Supabase.');return;}
-    await loadMarkVotes();drawMarks();toast(voteType==='confirm'?'Отметка подтверждена.':'Отмечено, что проблема устранена.');
+    if(!cloudReady||!supabaseClient){toast('Подтверждения работают после настройки таблицы public_mark_votes в Supabase.');return;}
+    if(votesInFlight.has(String(markId)))return;
+    if(markVotes.some(v=>String(v.mark_id)===String(markId)&&v.voter_token===voterToken)){
+      toast('Вы уже голосовали за эту отметку.');
+      // Re-render so both actions reflect the saved vote.
+      await loadMarkVotes();drawMarks();return;
+    }
+
+    const key=String(markId);
+    votesInFlight.add(key);
+    const popup=button.closest('.leaflet-popup-content');
+    const relatedButtons=popup?[...popup.querySelectorAll('.mark-vote')]:[button];
+    const originalLabels=relatedButtons.map(b=>b.textContent);
+    relatedButtons.forEach(b=>{b.disabled=true;b.style.opacity='.6';b.style.cursor='not-allowed';});
+    button.textContent=voteType==='confirm'?'Сохраняю подтверждение…':'Сохраняю отметку…';
+    try{
+      const {error}=await supabaseClient.from('public_mark_votes').insert({mark_id:String(markId),voter_token:voterToken,vote_type:voteType});
+      if(error){
+        console.error('Mark vote error:',error);
+        relatedButtons.forEach((b,i)=>{b.disabled=false;b.style.opacity='1';b.style.cursor='pointer';b.textContent=originalLabels[i];});
+        toast(error.code==='23505'?'Ваш голос уже учтён.':'Не удалось сохранить голос. Проверьте SQL-настройку Supabase.');
+        if(error.code==='23505'){await loadMarkVotes();drawMarks();}
+        return;
+      }
+      await loadMarkVotes();
+      drawMarks();
+      toast(voteType==='confirm'?'Отметка подтверждена. Второе действие для этой отметки больше недоступно.':'Проблема отмечена как устранённая. Подтверждение для этой отметки больше недоступно.');
+    }catch(err){
+      console.error('Mark vote exception:',err);
+      relatedButtons.forEach((b,i)=>{b.disabled=false;b.style.opacity='1';b.style.cursor='pointer';b.textContent=originalLabels[i];});
+      toast('Не удалось сохранить действие. Проверьте соединение и попробуйте ещё раз.');
+    }finally{
+      votesInFlight.delete(key);
+    }
   });
 
   // Deletion is intentionally public as requested: any visitor can delete any mark.
