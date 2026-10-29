@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#fff0f6">
+<meta name="theme-color" content="#fff1f6">
 <meta name="description" content="Безопасный путь — комфортные маршруты для вечерних прогулок">
 <title>Безопасный путь</title>
 
@@ -75,9 +75,10 @@ button:disabled{opacity:.65;cursor:default}
 }
 .secondary{height:46px;border:1px solid var(--line);background:#fff;border-radius:14px;color:#624f59}
 .hint{font-size:11px;color:var(--muted);margin:9px 2px 0;line-height:1.35}
+
 .route-list{margin-top:12px;display:grid;gap:8px}
 .route-card{
-  border:1px solid var(--line);background:#fff;border-radius:15px;padding:11px 12px;transition:.18s;
+  border:1px solid var(--line);background:#fff;border-radius:15px;padding:11px 12px;transition:none;
 }
 .route-card.active{border:2px solid var(--blue);padding:10px;box-shadow:0 8px 18px #2563eb18}
 .route-main{display:flex;align-items:center;justify-content:space-between;gap:10px}
@@ -136,7 +137,7 @@ button:disabled{opacity:.65;cursor:default}
 .modal-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:11px}.modal-actions button{height:44px;border-radius:13px;border:0;font-weight:800}.cancel{background:#eef2f7}.save{background:var(--primary);color:#fff}
 .toast{
   position:fixed;z-index:5000;left:50%;bottom:20px;transform:translate(-50%,120px);opacity:0;
-  background:#0b1220;color:#fff;padding:11px 14px;border-radius:13px;font-size:12px;box-shadow:0 10px 30px #0003;transition:.25s;max-width:calc(100vw - 30px);text-align:center
+  background:#0b1220;color:#fff;padding:11px 14px;border-radius:13px;font-size:12px;box-shadow:0 10px 30px #0003;transition:none;max-width:calc(100vw - 30px);text-align:center
 }
 .toast.show{transform:translate(-50%,0);opacity:1}
 
@@ -193,25 +194,74 @@ button:disabled{opacity:.65;cursor:default}
 }
 @media (min-width:850px){.mobile-bar{display:none!important}}
 
-/* Розовая тема интерфейса и отличающиеся точки A/B */
+
+/* Pink visual refresh — static styling only, no added animations */
 :root{
-  --primary:#c66f9b;--primary2:#e9a4c2;--blue:#c66f9b;--red:#e38bb3;
-  --line:#edc4d5;--shadow:0 14px 40px rgba(175,82,126,.16);
+  --bg:#fff3f7;--surface:#fff;--surface2:#fff8fb;--text:#402d37;--muted:#927987;
+  --line:#f0d6e1;--primary:#c77d9c;--primary2:#d99ab2;--blue:#b86f91;
+  --green:#83a98a;--orange:#d99b63;--red:#c96f87;
+  --shadow:0 12px 34px rgba(167,91,123,.16);--map-panel:rgba(255,250,252,.97);--map-input:#fff;--control-text:#624653
 }
-.point-dot.from,.ab-marker.start{background:#c66f9b!important}
-.point-dot.to,.ab-marker.end{background:#e38bb3!important}
-.primary,.save{background:linear-gradient(135deg,#c66f9b,#e9a4c2)!important}
-.route-card.active{border-color:#c66f9b!important;box-shadow:0 8px 18px #c66f9b24!important}
-.route-select,.route-go{background:#fbe7f0!important;color:#a64e78!important}
-.choice.sel{border-color:#c66f9b!important}
-.collapse-btn,.mini-btn,.secondary,.mute-btn{border-color:#edc4d5}
-.stop-btn{background:#f8dce8!important;color:#94436a!important}
-.mark-preview{background:#e38bb3!important}
-.user-dot{background:#c66f9b!important;box-shadow:0 2px 12px #c66f9b66!important}
-.user-arrow{border-bottom-color:#c66f9b!important}
-html[data-theme='dark']{--primary:#c66f9b;--primary2:#e9a4c2;--blue:#d783a8;--line:#493443}
-html[data-theme='dark'] .route-select,html[data-theme='dark'] .route-go{background:#422d3b!important;color:#f7d8e7!important}
-/* Пройденная часть маршрута */
+html[data-theme='dark']{--bg:#17121a;--surface:#211923;--surface2:#2b202a;--text:#f8edf3;--muted:#c1a9b7;--line:#483442;--primary:#c77d9c;--primary2:#9f6682;--blue:#d99ab2;--shadow:0 12px 34px rgba(0,0,0,.35);--map-panel:rgba(34,25,35,.97);--map-input:#2b202a;--control-text:#f4dfe9}
+#map{background:#f7e6ed}
+.topbar{top:12px;left:12px;right:12px}
+.brand,.icon-btn{background:rgba(128,75,99,.94);border:1px solid rgba(255,255,255,.28);box-shadow:0 8px 24px rgba(109,59,81,.22)}
+.brand{border-radius:17px;padding:11px 15px}
+.brand b{font-size:15px;letter-spacing:.15px}
+.brand span{color:#f4dce6}
+.icon-btn{border-radius:15px}
+.icon-btn:hover,.map-tool:hover{background:#a66b86;color:#fff}
+.search-card{background:rgba(255,251,253,.97);border:1px solid #f6e4eb;border-radius:23px;box-shadow:0 15px 38px rgba(156,82,115,.17);backdrop-filter:blur(12px)}
+.search-head h1{color:#59394a;letter-spacing:-.35px}
+.search-head p,.hint{color:#987d8c}
+.point-dot{box-shadow:0 3px 8px rgba(143,77,107,.18)}
+.point-dot.from{background:#b66c91}.point-dot.to{background:#d77d9b}
+.point-row input{border-color:#efd9e3;background:#fffafd;border-radius:14px;color:#493440}
+.point-row input:focus{border-color:#c77d9c;box-shadow:0 0 0 3px rgba(199,125,156,.15)}
+.mini-btn,.secondary{background:#fff5f9;border-color:#efd8e3;color:#8d5270}
+.primary{background:#c77d9c;box-shadow:0 5px 14px rgba(185,103,139,.2)}
+.primary:hover{background:#b96e8e}
+.route-card{background:#fffafd;border-color:#f0dce5;border-radius:16px}
+.route-card.active{border:2px solid #c77d9c;box-shadow:0 5px 15px rgba(190,111,146,.13)}
+.route-select,.route-go{background:#f9e8ef;color:#985574}
+.route-select:hover,.route-go:hover{background:#f2d8e3}
+.nav-instruction{background:rgba(128,75,99,.96);box-shadow:0 12px 30px rgba(80,43,61,.22);border-radius:20px}
+.maneuver-icon{background:#986780;color:#fff}
+.nav-card{background:rgba(255,251,253,.97);border-color:#f3e0e8}
+.stat{background:#fff0f5;border:1px solid #f5e0e9}
+.stat b{color:#75475e}
+.stop-btn{background:#f5dce6;color:#914d6b}
+.mute-btn{background:#fff7fa;color:#8c5670}
+.map-tool{background:rgba(255,250,252,.97);color:#88536b;border:1px solid #f1dce5;box-shadow:0 6px 18px rgba(118,66,88,.15);font-size:19px}
+.legend-pill{background:rgba(128,75,99,.91);color:#fff}
+.modal{border:1px solid #f3dfe8;background:#fffafd}
+.modal h2{color:#603d50}
+.choice{background:#fff7fa;border-color:#efd8e3;color:#644858}
+.choice.sel{border:2px solid #c77d9c;background:#fcecf2}
+.cancel{background:#f8eaf0;color:#80556a}
+.save{background:#c77d9c;color:#fff}
+.toast{background:#70485d;color:#fff;transition:none}
+.toast.show{transition:none}
+/* Clear, rose-toned A/B map pins */
+.ab-marker{width:34px;height:34px;border-radius:50% 50% 50% 12%;transform:rotate(-45deg);display:grid;place-items:center;color:#fff;font-weight:900;font-size:14px;border:3px solid #fff;box-shadow:0 4px 12px rgba(91,45,66,.3)}
+.ab-marker.start{background:#b86f91}
+.ab-marker.end{background:#d87998}
+.ab-marker{line-height:1}
+.ab-marker::first-letter{transform:rotate(45deg)}
+/* Make map marks readable and visually consistent */
+.mark-preview{background:#c77d9c;border:3px solid #fff;box-shadow:0 3px 12px rgba(145,76,106,.3)}
+.leaflet-control-zoom{overflow:hidden;border-radius:13px!important}
+.leaflet-control-zoom a{background:#fff8fb!important;color:#88536b!important}
+.leaflet-control-attribution{background:rgba(255,250,252,.8)!important;color:#7e6874!important}
+.mobile-bar{background:rgba(255,250,252,.97);border-top:1px solid #efd9e3;box-shadow:0 -7px 22px rgba(133,75,101,.1)}
+.mobile-bar button{color:#85546b}
+.mobile-bar button:active{background:#f8e5ed}
+@media(max-width:849px){
+  .search-card{background:rgba(255,251,253,.985);border-color:#f1dce5;box-shadow:0 -7px 28px rgba(146,77,106,.13)}
+  .brand{padding:10px 12px}
+  .icon-btn{background:rgba(128,75,99,.95)}
+  .legend-pill{bottom:calc(64px + env(safe-area-inset-bottom) + 8px)}
+}
 
 </style>
 </head>
@@ -353,7 +403,7 @@ html[data-theme='dark'] .route-select,html[data-theme='dark'] .route-go{backgrou
   $('themeTop').onclick=toggleTheme;$('mobileTheme').onclick=toggleTheme;
   let start = null, end = null;
   let startMarker = null, endMarker = null;
-  let routeLayers = [], routes = [], selected = 0, progressLayer = null;
+  let routeLayers = [], routes = [], selected = 0;
   let userMarker = null, watchId = null, currentPosition = null;
   let navigating = false, currentManeuver = 0, voiceOn = true, rerouteTimer = null, lastSpokenManeuver = -1;
   let pendingMarkType = null, pendingMarkPoint = null, pendingMarkPreview = null;
@@ -549,7 +599,7 @@ html[data-theme='dark'] .route-select,html[data-theme='dark'] .route-go{backgrou
     const positives=near.filter(m=>['good','shop','stop'].includes(m.type)).length;
     let explanation;
     if(!near.length) explanation='Рядом с маршрутом нет отметок. Это не означает, что маршрут безопасен — данных недостаточно.';
-    else explanation=`В радиусе 120 м: опасных отметок — ${hazards}, безлюдных участков — ${isolated}, положительных ориентиров — ${positives}.`;
+    else explanation=`В радиусе 120 м: опасных отметок — ${hazards}, безлюдных участков — ${isolated}, положительных ориентиров — ${positives}. Оценка основана на пользовательских отметках рядом с маршрутом и не гарантирует безопасность.`;
     return {score,near,hazards,isolated,nearDanger:hazards+isolated,positive:positives,explanation};
   }
 
@@ -628,7 +678,7 @@ html[data-theme='dark'] .route-select,html[data-theme='dark'] .route-go{backgrou
 
   function drawRoutes(){
     routes.forEach((r,i)=>{
-      const style={color:i===selected?'#e9a4c2':'#d8b9c8',weight:i===selected?7:5,opacity:i===selected?0.92:0.45};
+      const style={color:i===selected?'#c77d9c':'#d8b7c5',weight:i===selected?7:5,opacity:i===selected?0.92:0.45};
       const layer=L.polyline(r.coords.map(c=>[c[1],c[0]]),style).addTo(map);
       layer.on('click',()=>selectRoute(i));
       routeLayers.push(layer);
@@ -637,9 +687,8 @@ html[data-theme='dark'] .route-select,html[data-theme='dark'] .route-go{backgrou
   }
   function selectRoute(i){
     selected=i;
-    routeLayers.forEach((l,j)=>l.setStyle({color:j===i?'#e9a4c2':'#d8b9c8',weight:j===i?7:5,opacity:j===i?0.92:0.45}));
+    routeLayers.forEach((l,j)=>l.setStyle({color:j===i?'#c77d9c':'#d8b7c5',weight:j===i?7:5,opacity:j===i?0.92:0.45}));
     renderRouteCards();
-    if(navigating) updateRouteProgress(currentPosition,routes[selected]);
   }
   function routeTags(route,index){
     if(!routes.length)return [];
@@ -685,11 +734,11 @@ html[data-theme='dark'] .route-select,html[data-theme='dark'] .route-go{backgrou
 
   function stopNavigation(){
     navigating=false;
-    if(progressLayer){map.removeLayer(progressLayer);progressLayer=null;}
     if(rerouteTimer){clearTimeout(rerouteTimer);rerouteTimer=null;}
     if('speechSynthesis' in window) speechSynthesis.cancel();
     if(watchId!==null){navigator.geolocation.clearWatch(watchId);watchId=null}
     $('navPanel').style.display='none';$('navBottom').style.display='none';
+    if(routeLayers[selected] && routes[selected]) routeLayers[selected].setLatLngs(routes[selected].coords.map(c=>[c[1],c[0]]));
     $('searchCard').style.display='block';
     map.dragging.enable();map.touchZoom.enable();map.scrollWheelZoom.enable();
     toast('Навигация завершена.');
@@ -704,9 +753,8 @@ html[data-theme='dark'] .route-select,html[data-theme='dark'] .route-go{backgrou
     $('navPanel').style.display='block';$('navBottom').style.display='block';
     map.dragging.enable();map.touchZoom.enable();map.scrollWheelZoom.disable();
     updateNavigationUI();
-    updateRouteProgress(currentPosition, routes[selected]);
     if(navigator.geolocation){
-      watchId=navigator.geolocation.watchPosition(onNavPosition,(err)=>{toast(err && err.code===1?'Разрешите сайту доступ к геолокации.':'Сигнал GPS временно потерян.');},{
+      watchId=navigator.geolocation.watchPosition(onNavPosition,()=>toast('Сигнал GPS временно потерян.'),{
         enableHighAccuracy:true,maximumAge:1500,timeout:10000
       });
     }
@@ -721,9 +769,8 @@ html[data-theme='dark'] .route-select,html[data-theme='dark'] .route-go{backgrou
     const r=routes[selected];
     if(!r)return;
     // Follow the user gently, without snapping the map on every tiny GPS change.
-    map.panTo([currentPosition.lat,currentPosition.lng],{animate:true,duration:.35});
+    map.setView([currentPosition.lat,currentPosition.lng],map.getZoom(),{animate:false});
     advanceManeuvers();
-    updateRouteProgress(currentPosition,r);
     updateNavigationUI();
     // Soft off-route check. Rebuild from current position to destination.
     const nearest=nearestDistanceToRoute(currentPosition,r.coords);
@@ -741,32 +788,6 @@ html[data-theme='dark'] .route-select,html[data-theme='dark'] .route-go{backgrou
         toast('Похоже, вы ушли с маршрута. Перестраиваю…');
       }
     }else if(rerouteTimer){clearTimeout(rerouteTimer);rerouteTimer=null;}
-  }
-
-  // Рисуем пройденный участок ярко-розовым, а оставшийся — светло-розовым.
-  // Геометрия маршрута хранится как [lng, lat] (GeoJSON/Valhalla).
-  function updateRouteProgress(position, route){
-    if(!route || !Array.isArray(route.coords) || route.coords.length < 2) return;
-    if(progressLayer){map.removeLayer(progressLayer);progressLayer=null;}
-    if(!position){
-      progressLayer=L.polyline(route.coords.map(c=>[c[1],c[0]]),{
-        color:'#c66f9b',weight:7,opacity:.88,lineCap:'round',lineJoin:'round'
-      }).addTo(map);
-      return;
-    }
-    let nearestIndex=0,nearest=Infinity;
-    const coords=route.coords;
-    for(let i=0;i<coords.length;i++){
-      const d=hav(position,{lat:coords[i][1],lng:coords[i][0]});
-      if(d<nearest){nearest=d;nearestIndex=i;}
-    }
-    // Keep the remaining segment pale and emphasize the walked segment.
-    const walked=coords.slice(0,Math.max(1,nearestIndex+1)).map(c=>[c[1],c[0]]);
-    const remaining=coords.slice(Math.max(0,nearestIndex)).map(c=>[c[1],c[0]]);
-    const layers=[];
-    if(remaining.length>1) layers.push(L.polyline(remaining,{color:'#e9a4c2',weight:7,opacity:.9,lineCap:'round',lineJoin:'round'}));
-    if(walked.length>1) layers.push(L.polyline(walked,{color:'#c66f9b',weight:7,opacity:1,lineCap:'round',lineJoin:'round'}));
-    progressLayer=L.layerGroup(layers).addTo(map);
   }
 
   function nearestDistanceToRoute(p,coords){
@@ -814,6 +835,11 @@ html[data-theme='dark'] .route-select,html[data-theme='dark'] .route-go{backgrou
       let nearestIndex=0,nearest=Infinity;
       const stride=Math.max(1,Math.floor(r.coords.length/500));
       for(let i=0;i<r.coords.length;i+=stride){const c=r.coords[i];const d=hav(currentPosition,{lat:c[1],lng:c[0]});if(d<nearest){nearest=d;nearestIndex=i;}}
+      // В режиме навигации оставляем на карте только непройденную часть маршрута.
+      if(navigating && routeLayers[selected] && r.coords.length>1){
+        const remainingCoords=r.coords.slice(Math.min(nearestIndex,r.coords.length-1)).map(c=>[c[1],c[0]]);
+        routeLayers[selected].setLatLngs(remainingCoords.length>1?remainingCoords:[r.coords[r.coords.length-1]].map(c=>[c[1],c[0]]));
+      }
       let along=0;
       for(let i=nearestIndex+1;i<r.coords.length;i++){
         const a=r.coords[i-1],b=r.coords[i];along+=hav({lat:a[1],lng:a[0]},{lat:b[1],lng:b[0]});
@@ -864,12 +890,14 @@ html[data-theme='dark'] .route-select,html[data-theme='dark'] .route-go{backgrou
   }
 
   function markIcon(type){
-    const emoji = ({hazard:'🔴',isolated:'🟠',good:'🟢',shop:'🏪',stop:'🚏'})[type] || '📍';
+    const emoji = ({hazard:'!',isolated:'…',good:'✓',shop:'⌂',stop:'↗'})[type] || '•';
+    const color = ({hazard:'#c96f87',isolated:'#d99b63',good:'#83a98a',shop:'#b86f91',stop:'#a982b2'})[type] || '#c77d9c';
     return L.divIcon({
       className:'',
-      html:`<div style="font-size:21px;filter:drop-shadow(0 2px 2px #0004)">${emoji}</div>`,
-      iconSize:[25,25],
-      iconAnchor:[12,12]
+      html:`<div style="width:29px;height:29px;display:grid;place-items:center;border-radius:50% 50% 50% 12%;transform:rotate(-45deg);background:${color};border:3px solid #fff;box-shadow:0 3px 10px rgba(91,45,66,.3);color:#fff;font-size:14px;font-weight:900"><span style="transform:rotate(45deg)">${emoji}</span></div>`,
+      iconSize:[29,29],
+      iconAnchor:[14,14],
+      popupAnchor:[0,-12]
     });
   }
 
@@ -889,15 +917,15 @@ html[data-theme='dark'] .route-select,html[data-theme='dark'] .route-go{backgrou
       const votes=markVotes.filter(v=>String(v.mark_id)===String(m.id));
       const confirms=votes.filter(v=>v.vote_type==='confirm').length;
       const resolved=votes.filter(v=>v.vote_type==='resolved').length;
-      const myVotes=new Set(votes.filter(v=>v.voter_token===voterToken).map(v=>v.vote_type));
+      const myVote=votes.find(v=>v.voter_token===voterToken)?.vote_type;
       info.textContent = `Добавлено: ${dateText}. Подтверждений: ${confirms}.` + (['hazard','isolated'].includes(m.type)?` Отметок об устранении: ${resolved}.`:'');
       info.style.cssText = 'font-size:11px;margin:4px 0 8px;max-width:230px';
       const actions=document.createElement('div');actions.style.cssText='display:flex;flex-wrap:wrap;gap:5px;margin:7px 0';
-      const confirmBtn=document.createElement('button');confirmBtn.type='button';confirmBtn.className='mark-vote';confirmBtn.dataset.markId=String(m.id);confirmBtn.dataset.voteType='confirm';confirmBtn.textContent=myVotes.has('confirm')?'✓ Подтверждено':'👍 Подтверждаю';confirmBtn.disabled=myVotes.has('confirm');
+      const confirmBtn=document.createElement('button');confirmBtn.type='button';confirmBtn.className='mark-vote';confirmBtn.dataset.markId=String(m.id);confirmBtn.dataset.voteType='confirm';confirmBtn.textContent=myVote==='confirm'?'✓ Подтверждено':'👍 Подтверждаю';confirmBtn.disabled=!!myVote;
       [confirmBtn].forEach(b=>b.style.cssText='border:0;border-radius:8px;padding:7px 8px;background:#e0f2fe;color:#075985;font-weight:700;cursor:pointer;font-size:11px');
       actions.append(confirmBtn);
       if(['hazard','isolated'].includes(m.type)){
-        const resolvedBtn=document.createElement('button');resolvedBtn.type='button';resolvedBtn.className='mark-vote';resolvedBtn.dataset.markId=String(m.id);resolvedBtn.dataset.voteType='resolved';resolvedBtn.textContent=myVotes.has('resolved')?'✓ Отмечено':'Проблема устранена';resolvedBtn.disabled=myVotes.has('resolved');
+        const resolvedBtn=document.createElement('button');resolvedBtn.type='button';resolvedBtn.className='mark-vote';resolvedBtn.dataset.markId=String(m.id);resolvedBtn.dataset.voteType='resolved';resolvedBtn.textContent=myVote==='resolved'?'✓ Отмечено':'Проблема устранена';resolvedBtn.disabled=!!myVote;
         resolvedBtn.style.cssText='border:0;border-radius:8px;padding:7px 8px;background:#e0f2fe;color:#075985;font-weight:700;cursor:pointer;font-size:11px';
         actions.append(resolvedBtn);
       }
@@ -986,13 +1014,13 @@ html[data-theme='dark'] .route-select,html[data-theme='dark'] .route-go{backgrou
     }
   }
 
-  // Один голос каждого типа на отметку для каждого браузерного токена. Уникальность проверяется и базой данных.
+  // One vote per browser token per mark. The database UNIQUE constraint is the final duplicate guard.
   document.addEventListener('click', async e=>{
     const button=e.target.closest('.mark-vote');if(!button)return;
     if(!cloudReady||!supabaseClient){toast('Подтверждения работают после настройки таблицы public_mark_votes в Supabase.');return;}
     const markId=button.dataset.markId, voteType=button.dataset.voteType;
     if(!markId||!['confirm','resolved'].includes(voteType))return;
-    if(markVotes.some(v=>String(v.mark_id)===String(markId)&&v.voter_token===voterToken&&v.vote_type===voteType)){toast('Вы уже отправляли этот тип голоса за отметку.');return;}
+    if(markVotes.some(v=>String(v.mark_id)===String(markId)&&v.voter_token===voterToken)){toast('Вы уже голосовали за эту отметку.');return;}
     button.disabled=true;
     const {error}=await supabaseClient.from('public_mark_votes').insert({mark_id:String(markId),voter_token:voterToken,vote_type:voteType});
     if(error){console.error('Mark vote error:',error);button.disabled=false;toast(error.code==='23505'?'Ваш голос уже учтён.':'Не удалось сохранить голос. Проверьте SQL-настройку Supabase.');return;}
