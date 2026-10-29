@@ -249,8 +249,8 @@ html[data-theme='dark']{--bg:#17121a;--surface:#211923;--surface2:#2b202a;--text
 .toast.show{transition:none}
 /* Clear, rose-toned A/B map pins */
 .ab-marker{width:34px;height:34px;border-radius:50%;transform:none;display:grid;place-items:center;color:#fff;font-weight:900;font-size:14px;border:3px solid #fff;box-shadow:0 4px 12px rgba(91,45,66,.3)}
-.ab-marker.start{background:#b86f91}
-.ab-marker.end{background:#d87998}
+.ab-marker.start{background:#8eabc9}
+.ab-marker.end{background:#c98282}
 .ab-marker{line-height:1}
 /* Make map marks readable and visually consistent */
 .mark-preview{background:#c77d9c;border:3px solid #fff;box-shadow:0 3px 12px rgba(145,76,106,.3)}
@@ -506,7 +506,18 @@ html[data-theme='dark']{--bg:#17121a;--surface:#211923;--surface2:#2b202a;--text
     if(navigating) return;
     if(!start){setPoint('start',e.latlng);reverseGeocode(e.latlng,'from');toast('Начало выбрано. Теперь выберите конец.')}
     else if(!end){setPoint('to',e.latlng);reverseGeocode(e.latlng,'to');toast('Конец выбран. Строй маршрут.')}
-    else {clearRoutes();setPoint('start',e.latlng);end=null;reverseGeocode(e.latlng,'from');toast('Новое начало выбрано.')}
+    else {
+      // Новый клик после заполнения A и B начинает новый маршрут:
+      // удаляем старую точку B и сбрасываем её значение в форме,
+      // чтобы маркер на карте и состояние маршрута всегда совпадали.
+      clearRoutes();
+      if(endMarker){map.removeLayer(endMarker);endMarker=null;}
+      end=null;
+      $('to').value='';
+      setPoint('start',e.latlng);
+      reverseGeocode(e.latlng,'from');
+      toast('Новое начало выбрано. Теперь выберите конец.');
+    }
   });
 
   async function reverseGeocode(p,field){
