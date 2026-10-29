@@ -615,7 +615,7 @@ html[data-theme='dark']{--bg:#17121a;--surface:#211923;--surface2:#2b202a;--text
     const positives=near.filter(m=>['good','shop','stop'].includes(m.type)).length;
     let explanation;
     if(!near.length) explanation='Рядом с маршрутом нет отметок. Это не означает, что маршрут безопасен — данных недостаточно.';
-    else explanation=`В радиусе 120 м: опасных отметок — ${hazards}, безлюдных участков — ${isolated}, положительных ориентиров — ${positives}. Оценка основана на пользовательских отметках рядом с маршрутом и не гарантирует безопасность.`;
+    else explanation=`В радиусе 120 м: опасных отметок — ${hazards}, безлюдных участков — ${isolated}, положительных ориентиров — ${positives}.`;
     return {score,near,hazards,isolated,nearDanger:hazards+isolated,positive:positives,explanation};
   }
 
