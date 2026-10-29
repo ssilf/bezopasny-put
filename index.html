@@ -134,6 +134,11 @@ button:disabled{opacity:.65;cursor:default}
 .modal h2{font-size:18px;margin:0}.modal p{font-size:11px;color:var(--muted);margin:4px 0 11px}
 .choices{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .choice{border:1px solid var(--line);border-radius:13px;padding:11px;font-size:12px;background:#fff}.choice.sel{border:2px solid var(--primary);padding:10px}
+.choice{display:flex;align-items:center;gap:8px;text-align:left;min-height:42px}
+.choice-symbol{width:24px;height:24px;flex:0 0 24px;display:inline-grid;place-items:center;border:2px solid #fff;border-radius:50% 50% 50% 12%;transform:rotate(-45deg);color:#fff;font-size:12px;font-weight:900;box-shadow:0 2px 6px #0002}
+.choice-symbol span{transform:rotate(45deg)}
+.choice-symbol.hazard{background:#c96f87}.choice-symbol.isolated{background:#d99b63}.choice-symbol.good{background:#83a98a}.choice-symbol.shop{background:#b86f91}.choice-symbol.stop{background:#a982b2}
+
 .modal-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:11px}.modal-actions button{height:44px;border-radius:13px;border:0;font-weight:800}.cancel{background:#eef2f7}.save{background:var(--primary);color:#fff}
 .toast{
   position:fixed;z-index:5000;left:50%;bottom:20px;transform:translate(-50%,120px);opacity:0;
@@ -243,11 +248,10 @@ html[data-theme='dark']{--bg:#17121a;--surface:#211923;--surface2:#2b202a;--text
 .toast{background:#70485d;color:#fff;transition:none}
 .toast.show{transition:none}
 /* Clear, rose-toned A/B map pins */
-.ab-marker{width:34px;height:34px;border-radius:50% 50% 50% 12%;transform:rotate(-45deg);display:grid;place-items:center;color:#fff;font-weight:900;font-size:14px;border:3px solid #fff;box-shadow:0 4px 12px rgba(91,45,66,.3)}
+.ab-marker{width:34px;height:34px;border-radius:50%;transform:none;display:grid;place-items:center;color:#fff;font-weight:900;font-size:14px;border:3px solid #fff;box-shadow:0 4px 12px rgba(91,45,66,.3)}
 .ab-marker.start{background:#b86f91}
 .ab-marker.end{background:#d87998}
 .ab-marker{line-height:1}
-.ab-marker::first-letter{transform:rotate(45deg)}
 /* Make map marks readable and visually consistent */
 .mark-preview{background:#c77d9c;border:3px solid #fff;box-shadow:0 3px 12px rgba(145,76,106,.3)}
 .leaflet-control-zoom{overflow:hidden;border-radius:13px!important}
@@ -350,11 +354,11 @@ html[data-theme='dark']{--bg:#17121a;--surface:#211923;--surface2:#2b202a;--text
     <h2>Добавить отметку</h2>
     <p>Выберите тип отметки и укажите место на карте. После сохранения она появится на общей карте для других посетителей.</p>
     <div class="choices" id="choices">
-      <div class="choice" data-type="hazard">🔴 Плохое освещение</div>
-      <div class="choice" data-type="isolated">🟠 Безлюдный участок</div>
-      <div class="choice" data-type="good">🟢 Хорошо освещено / людно</div>
-      <div class="choice" data-type="shop">🏪 Открытое место / магазин</div>
-      <div class="choice" data-type="stop">🚏 Остановка рядом</div>
+      <div class="choice" data-type="hazard"><span class="choice-symbol hazard"><span>!</span></span><span>Плохое освещение</span></div>
+      <div class="choice" data-type="isolated"><span class="choice-symbol isolated"><span>…</span></span><span>Безлюдный участок</span></div>
+      <div class="choice" data-type="good"><span class="choice-symbol good"><span>✓</span></span><span>Хорошо освещено / людно</span></div>
+      <div class="choice" data-type="shop"><span class="choice-symbol shop"><span>⌂</span></span><span>Открытое место / магазин</span></div>
+      <div class="choice" data-type="stop"><span class="choice-symbol stop"><span>↗</span></span><span>Остановка рядом</span></div>
     </div>
     <p id="markHint" style="margin-top:10px">1. Выберите тип. 2. Коснитесь карты.</p>
     <div class="modal-actions"><button class="cancel" id="cancelMark">Отмена</button><button class="save" id="saveMark">Сохранить</button></div>
@@ -585,8 +589,7 @@ html[data-theme='dark']{--bg:#17121a;--surface:#211923;--surface2:#2b202a;--text
     if(!coords.length)return {score:null,near,hazards:0,isolated:0,nearDanger:0,positive:0,explanation:'Нет геометрии маршрута для анализа отметок.'};
     const stride=Math.max(1,Math.floor(coords.length/240));
     for(const m of marks){
-      let min=Infinity;
-      for(let i=0;i<coords.length;i+=stride){const c=coords[i];min=Math.min(min,hav({lat:c[1],lng:c[0]},m));}
+      const min=nearestDistanceToRoute({lat:Number(m.lat),lng:Number(m.lng)},coords);
       if(min<=120)near.push({...m,distanceToRoute:min});
     }
     const weights={hazard:3,isolated:2,good:2,shop:1,stop:1};
@@ -629,9 +632,34 @@ html[data-theme='dark']{--bg:#17121a;--surface:#211923;--surface2:#2b202a;--text
     return out;
   }
 
+  function validateRouteGeometry(coords, expectedStart, expectedEnd){
+    if(!Array.isArray(coords) || coords.length < 2) return {ok:false, reason:'В маршруте недостаточно координат.'};
+    let total=0, previous=null;
+    for(const c of coords){
+      if(!Array.isArray(c) || c.length < 2) return {ok:false,reason:'Некорректная точка маршрута.'};
+      const lon=Number(c[0]), lat=Number(c[1]);
+      if(!Number.isFinite(lat)||!Number.isFinite(lon)||lat < -90||lat > 90||lon < -180||lon > 180)
+        return {ok:false,reason:'Координаты маршрута вне допустимого диапазона.'};
+      if(previous) total += hav({lat:previous[1],lng:previous[0]},{lat,lng:lon});
+      previous=[lon,lat];
+    }
+    if(!Number.isFinite(total)||total<5) return {ok:false,reason:'Маршрут имеет нулевую или некорректную длину.'};
+    // Valhalla may snap endpoints to nearby walkable roads, but a large mismatch
+    // usually means coordinate order/geometry is wrong.
+    if(expectedStart && hav(expectedStart,{lat:coords[0][1],lng:coords[0][0]})>1500)
+      return {ok:false,reason:'Начало линии маршрута далеко от выбранной точки.'};
+    if(expectedEnd && hav(expectedEnd,{lat:coords[coords.length-1][1],lng:coords[coords.length-1][0]})>1500)
+      return {ok:false,reason:'Конец линии маршрута далеко от выбранной точки.'};
+    return {ok:true,total};
+  }
+
   function tripToRoute(trip){
-    const leg=trip.legs?.[0];
+    const leg=trip?.legs?.[0];
     const coords=tripShape(trip);
+    const validation=validateRouteGeometry(coords,start,end);
+    if(!validation.ok) throw new Error(validation.reason);
+    if(!trip.summary || !Number.isFinite(Number(trip.summary.length)) || !Number.isFinite(Number(trip.summary.time)))
+      throw new Error('У маршрута отсутствует корректная информация о расстоянии или времени.');
     return {trip,coords,summary:trip.summary,leg,maneuvers:leg?.maneuvers||[],score:safetyScore({coords})};
   }
 
@@ -657,8 +685,13 @@ html[data-theme='dark']{--bg:#17121a;--surface:#211923;--surface2:#2b202a;--text
       const r=await fetch(url);
       const data=await r.json();
       if(!r.ok || !data.trip) throw new Error(data.error || data.message || 'Маршрут не найден');
-      const all=[data.trip,...(data.alternates||[]).map(x=>x.trip||x)].filter(Boolean).map(tripToRoute);
-      if(!all.length)throw new Error('Маршрут не найден');
+      const candidates=[data.trip,...(data.alternates||[]).map(x=>x.trip||x)].filter(Boolean);
+      const all=[];
+      for(const candidate of candidates){
+        try{all.push(tripToRoute(candidate));}
+        catch(routeError){console.warn('Пропущен некорректный вариант маршрута:',routeError.message);}
+      }
+      if(!all.length)throw new Error('Сервис вернул маршрут с некорректной геометрией. Попробуйте выбрать точки ближе к пешеходным дорогам.');
       routes=all;
       selected=0;
       const fromLabel=$('from').value.trim()||`${start.lat.toFixed(5)}, ${start.lng.toFixed(5)}`;
@@ -669,7 +702,7 @@ html[data-theme='dark']{--bg:#17121a;--surface:#211923;--surface2:#2b202a;--text
       toast(`Готово: ${routes.length} вариант(а).`);
     }catch(e){
       console.error(e);
-      toast('Не получилось построить маршрут. Попробуйте другую точку или повторите через несколько секунд.');
+      toast(e.message || 'Не получилось построить маршрут. Попробуйте другую точку или повторите через несколько секунд.');
     }finally{
       $('buildBtn').disabled=false;$('buildBtn').textContent='🚶 Построить маршрут';
     }
@@ -791,9 +824,20 @@ html[data-theme='dark']{--bg:#17121a;--surface:#211923;--surface2:#2b202a;--text
   }
 
   function nearestDistanceToRoute(p,coords){
+    if(!Array.isArray(coords)||coords.length<2)return Infinity;
     let min=Infinity;
-    for(let i=0;i<coords.length;i+=Math.max(1,Math.floor(coords.length/120))){
-      min=Math.min(min,hav(p,{lat:coords[i][1],lng:coords[i][0]}));
+    const latScale=111320, lonScale=111320*Math.cos(p.lat*Math.PI/180);
+    for(let i=1;i<coords.length;i++){
+      const a=coords[i-1],b=coords[i];
+      if(!a||!b)continue;
+      // Project each segment to a local metre grid and measure to the segment,
+      // not just its vertices (important on long, sparsely sampled lines).
+      const ax=(a[0]-p.lng)*lonScale, ay=(a[1]-p.lat)*latScale;
+      const bx=(b[0]-p.lng)*lonScale, by=(b[1]-p.lat)*latScale;
+      const dx=bx-ax,dy=by-ay,den=dx*dx+dy*dy;
+      const t=den?Math.max(0,Math.min(1,-(ax*dx+ay*dy)/den)):0;
+      min=Math.min(min,Math.hypot(ax+t*dx,ay+t*dy));
+      if(min<2)break;
     }
     return min;
   }
