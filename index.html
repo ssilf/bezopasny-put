@@ -665,13 +665,19 @@ html[data-theme='dark']{--bg:#17121a;--surface:#211923;--surface2:#2b202a;--text
 
   async function fetchRoute(){
     if(!start||!end){toast('Сначала укажите начало и конец маршрута.');return}
-    $('buildBtn').disabled=true;$('buildBtn').textContent='Строю маршрут…';
+    if(hav(start,end)<8){toast('Начало и конец почти совпадают. Выберите точки подальше друг от друга.');return}
+    const buildButton=$('buildBtn');
+    buildButton.disabled=true;buildButton.textContent='Строю маршрут…';
     clearRoutes();
     try{
+      const origin={lat:Number(start.lat),lon:Number(start.lng)};
+      const destination={lat:Number(end.lat),lon:Number(end.lng)};
+      if(!Number.isFinite(origin.lat)||!Number.isFinite(origin.lon)||!Number.isFinite(destination.lat)||!Number.isFinite(destination.lon))
+        throw new Error('Проверьте точки начала и конца маршрута.');
       const payload={
         locations:[
-          {lat:start.lat,lon:start.lng,type:'break'},
-          {lat:end.lat,lon:end.lng,type:'break'}
+          {...origin,type:'break'},
+          {...destination,type:'break'}
         ],
         costing:'pedestrian',
         costing_options:{pedestrian:{use_roads:0.1,use_living_streets:0.8,sidewalk_factor:0.2,alley_factor:2.0,driveway_factor:2.0}},
@@ -681,30 +687,51 @@ html[data-theme='dark']{--bg:#17121a;--surface:#211923;--surface2:#2b202a;--text
         directions_options:{units:'kilometers',language:'ru-RU'},
         id:'safe-path-web'
       };
-      const url=ROUTER+'?json='+encodeURIComponent(JSON.stringify(payload));
-      const r=await fetch(url);
-      const data=await r.json();
-      if(!r.ok || !data.trip) throw new Error(data.error || data.message || 'Маршрут не найден');
-      const candidates=[data.trip,...(data.alternates||[]).map(x=>x.trip||x)].filter(Boolean);
-      const all=[];
-      for(const candidate of candidates){
-        try{all.push(tripToRoute(candidate));}
-        catch(routeError){console.warn('Пропущен некорректный вариант маршрута:',routeError.message);}
+      // Use POST for Valhalla's JSON API and enforce a timeout so the button
+      // can never remain stuck in the loading state indefinitely.
+      const controller=new AbortController();
+      const timeoutId=setTimeout(()=>controller.abort(),20000);
+      let response,data;
+      try{
+        response=await fetch(ROUTER,{
+          method:'POST',
+          headers:{'Content-Type':'application/json','Accept':'application/json'},
+          body:JSON.stringify(payload),
+          signal:controller.signal
+        });
+        const raw=await response.text();
+        try{data=JSON.parse(raw)}catch(_){throw new Error('Сервис маршрутов вернул непонятный ответ. Попробуйте ещё раз.')}
+      }finally{clearTimeout(timeoutId)}
+      if(!response.ok || !data || !data.trip){
+        const details=data?.error || data?.status_message || data?.message;
+        throw new Error(typeof details==='string'&&details.trim()?details:'Сервис не смог построить пешеходный маршрут. Попробуйте выбрать точки рядом с дорогами или повторить позже.');
       }
-      if(!all.length)throw new Error('Сервис вернул маршрут с некорректной геометрией. Попробуйте выбрать точки ближе к пешеходным дорогам.');
+      const candidates=[data.trip,...(Array.isArray(data.alternates)?data.alternates.map(x=>x?.trip||x):[])].filter(Boolean);
+      const all=[];
+      const routeErrors=[];
+      for(const candidate of candidates){
+        try{all.push(tripToRoute(candidate))}
+        catch(routeError){routeErrors.push(routeError.message);console.warn('Пропущен некорректный вариант маршрута:',routeError.message)}
+      }
+      if(!all.length){
+        throw new Error(routeErrors[0]||'Сервис не вернул корректную линию маршрута. Попробуйте выбрать другие точки.');
+      }
       routes=all;
       selected=0;
-      const fromLabel=$('from').value.trim()||`${start.lat.toFixed(5)}, ${start.lng.toFixed(5)}`;
-      const toLabel=$('to').value.trim()||`${end.lat.toFixed(5)}, ${end.lng.toFixed(5)}`;
       drawRoutes();
       fitRoutes();
       $('hint').textContent='Выберите маршрут. Затем нажмите «Начать навигацию».';
       toast(`Готово: ${routes.length} вариант(а).`);
     }catch(e){
-      console.error(e);
-      toast(e.message || 'Не получилось построить маршрут. Попробуйте другую точку или повторите через несколько секунд.');
+      console.error('Ошибка построения маршрута:',e);
+      const message=e?.name==='AbortError'
+        ?'Сервис маршрутов не ответил за 20 секунд. Проверьте интернет и попробуйте ещё раз.'
+        :(!navigator.onLine?'Нет подключения к интернету.':(e?.message||'Не получилось построить маршрут. Попробуйте ещё раз.'));
+      $('hint').textContent=message;
+      toast(message);
     }finally{
-      $('buildBtn').disabled=false;$('buildBtn').textContent='🚶 Построить маршрут';
+      buildButton.disabled=false;
+      buildButton.textContent='🚶 Построить маршрут';
     }
   }
   $('buildBtn').onclick=fetchRoute;
