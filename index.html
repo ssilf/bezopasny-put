@@ -138,6 +138,10 @@ button:disabled{opacity:.65;cursor:default}
 .choice-symbol{width:24px;height:24px;flex:0 0 24px;display:inline-grid;place-items:center;border:2px solid #fff;border-radius:50% 50% 50% 12%;transform:rotate(-45deg);color:#fff;font-size:12px;font-weight:900;box-shadow:0 2px 6px #0002}
 .choice-symbol span{transform:rotate(45deg)}
 .choice-symbol.hazard{background:#c96f87}.choice-symbol.isolated{background:#d99b63}.choice-symbol.good{background:#83a98a}.choice-symbol.shop{background:#b86f91}.choice-symbol.stop{background:#a982b2}
+.choice-symbol.dark{background:#765b75}.choice-symbol.crowded{background:#5f9b79}.choice-symbol.venue{background:#b86f91}.choice-symbol.security{background:#6689ad}.choice-symbol.medical{background:#5d9b91}.choice-symbol.dangerous{background:#b85f55}
+.mark-description{display:none;width:100%;min-height:76px;resize:vertical;border:1px solid var(--line);border-radius:12px;padding:10px;background:var(--map-input);color:var(--text);font:inherit;font-size:13px;margin-top:9px}
+.mark-description:focus{outline:2px solid #c77d9c55;border-color:var(--primary)}
+.mark-description-label{display:none;font-size:12px;color:var(--muted);margin-top:10px}
 
 .modal-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:11px}.modal-actions button{height:44px;border-radius:13px;border:0;font-weight:800}.cancel{background:#eef2f7}.save{background:var(--primary);color:#fff}
 .toast{
@@ -354,12 +358,18 @@ html[data-theme='dark']{--bg:#17121a;--surface:#211923;--surface2:#2b202a;--text
     <h2>Добавить отметку</h2>
     <p>Выберите тип отметки и укажите место на карте. После сохранения она появится на общей карте для других посетителей.</p>
     <div class="choices" id="choices">
-      <div class="choice" data-type="hazard"><span class="choice-symbol hazard"><span>!</span></span><span>Плохое освещение</span></div>
+      <div class="choice" data-type="dark"><span class="choice-symbol dark"><span>☾</span></span><span>Плохо освещённый участок</span></div>
+      <div class="choice" data-type="well_lit"><span class="choice-symbol crowded"><span>☀</span></span><span>Хорошо освещённый участок</span></div>
+      <div class="choice" data-type="crowded"><span class="choice-symbol crowded"><span>👥</span></span><span>Многолюдный участок</span></div>
       <div class="choice" data-type="isolated"><span class="choice-symbol isolated"><span>…</span></span><span>Безлюдный участок</span></div>
-      <div class="choice" data-type="good"><span class="choice-symbol good"><span>✓</span></span><span>Хорошо освещено / людно</span></div>
-      <div class="choice" data-type="shop"><span class="choice-symbol shop"><span>⌂</span></span><span>Открытое место / магазин</span></div>
-      <div class="choice" data-type="stop"><span class="choice-symbol stop"><span>↗</span></span><span>Остановка рядом</span></div>
+      <div class="choice" data-type="venue"><span class="choice-symbol venue"><span>⌂</span></span><span>Открытый магазин / кафе / заведение</span></div>
+      <div class="choice" data-type="stop"><span class="choice-symbol stop"><span>↗</span></span><span>Остановка общественного транспорта</span></div>
+      <div class="choice" data-type="security"><span class="choice-symbol security"><span>●</span></span><span>Камера / охрана / полиция / SOS</span></div>
+      <div class="choice" data-type="medical"><span class="choice-symbol medical"><span>✚</span></span><span>Аптека / медицинское учреждение</span></div>
+      <div class="choice" data-type="dangerous"><span class="choice-symbol dangerous"><span>!</span></span><span>Потенциально опасное место</span></div>
     </div>
+    <label class="mark-description-label" id="markDescriptionLabel" for="markDescription">Описание опасного места (необязательно)</label>
+    <textarea class="mark-description" id="markDescription" maxlength="500" placeholder="Например: разбитый тротуар, плохо видимый переход, агрессивные собаки…"></textarea>
     <p id="markHint" style="margin-top:10px">1. Выберите тип. 2. Коснитесь карты.</p>
     <div class="modal-actions"><button class="cancel" id="cancelMark">Отмена</button><button class="save" id="saveMark">Сохранить</button></div>
   </div>
@@ -438,19 +448,27 @@ html[data-theme='dark']{--bg:#17121a;--surface:#211923;--surface2:#2b202a;--text
   }
   // Snapshot of marks saved by an older local-only version; migrate them only if cloud DB is empty.
   const initialCachedMarks = marks.map(m=>({
-    type:m.type, lat:Number(m.lat), lng:Number(m.lng)
+    type:m.type, lat:Number(m.lat), lng:Number(m.lng),
+    ...(m.type==='dangerous' && m.description ? {description:String(m.description).slice(0,500)} : {})
   })).filter(m=>labelMapSafeType(m.type) && Number.isFinite(m.lat) && Number.isFinite(m.lng));
   function labelMapSafeType(type){
-    return ['hazard','isolated','good','shop','stop'].includes(type);
+    return ['hazard','isolated','good','shop','stop','dark','well_lit','crowded','venue','security','medical','dangerous'].includes(type);
   }
   let placingMark = false;
 
   const labelMap = {
     hazard:'Плохое освещение',
+    dark:'Плохо освещённый участок',
+    well_lit:'Хорошо освещённый участок',
+    crowded:'Многолюдный участок',
     isolated:'Безлюдный участок',
     good:'Хорошо освещено / людно',
     shop:'Открытое место / магазин',
-    stop:'Остановка рядом'
+    venue:'Открытый магазин / кафе / заведение',
+    stop:'Остановка общественного транспорта',
+    security:'Камера видеонаблюдения / охрана / полиция / SOS',
+    medical:'Аптека / медицинское учреждение',
+    dangerous:'Потенциально опасное место'
   };
 
   function toast(text){
@@ -605,14 +623,14 @@ html[data-theme='dark']{--bg:#17121a;--surface:#211923;--surface2:#2b202a;--text
       const min=nearestDistanceToRoute({lat:Number(m.lat),lng:Number(m.lng)},coords);
       if(min<=120)near.push({...m,distanceToRoute:min});
     }
-    const weights={hazard:3,isolated:2,good:2,shop:1,stop:1};
-    const negative=near.filter(m=>m.type==='hazard'||m.type==='isolated').reduce((n,m)=>n+(weights[m.type]||0),0);
-    const positive=near.filter(m=>['good','shop','stop'].includes(m.type)).reduce((n,m)=>n+(weights[m.type]||0),0);
+    const weights={hazard:3,dark:3,dangerous:4,isolated:2,good:2,well_lit:2,crowded:2,shop:1,venue:1,stop:1,security:2,medical:1};
+    const negative=near.filter(m=>['hazard','dark','dangerous','isolated'].includes(m.type)).reduce((n,m)=>n+(weights[m.type]||0),0);
+    const positive=near.filter(m=>['good','well_lit','crowded','shop','venue','stop','security','medical'].includes(m.type)).reduce((n,m)=>n+(weights[m.type]||0),0);
     const total=negative+positive;
     const score=total?Math.round(100*positive/total):null;
-    const hazards=near.filter(m=>m.type==='hazard').length;
+    const hazards=near.filter(m=>['hazard','dark','dangerous'].includes(m.type)).length;
     const isolated=near.filter(m=>m.type==='isolated').length;
-    const positives=near.filter(m=>['good','shop','stop'].includes(m.type)).length;
+    const positives=near.filter(m=>['good','well_lit','crowded','shop','venue','stop','security','medical'].includes(m.type)).length;
     let explanation;
     if(!near.length) explanation='Рядом с маршрутом нет отметок. Это не означает, что маршрут безопасен — данных недостаточно.';
     else explanation=`В радиусе 120 м: опасных отметок — ${hazards}, безлюдных участков — ${isolated}, положительных ориентиров — ${positives}.`;
@@ -974,8 +992,8 @@ html[data-theme='dark']{--bg:#17121a;--surface:#211923;--surface2:#2b202a;--text
   }
 
   function markIcon(type){
-    const emoji = ({hazard:'!',isolated:'…',good:'✓',shop:'⌂',stop:'↗'})[type] || '•';
-    const color = ({hazard:'#c96f87',isolated:'#d99b63',good:'#83a98a',shop:'#b86f91',stop:'#a982b2'})[type] || '#c77d9c';
+    const emoji = ({hazard:'!',dark:'☾',well_lit:'☀',crowded:'👥',isolated:'…',good:'✓',shop:'⌂',venue:'⌂',stop:'↗',security:'●',medical:'✚',dangerous:'!'})[type] || '•';
+    const color = ({hazard:'#c96f87',dark:'#765b75',well_lit:'#83a98a',crowded:'#5f9b79',isolated:'#d99b63',good:'#83a98a',shop:'#b86f91',venue:'#b86f91',stop:'#a982b2',security:'#6689ad',medical:'#5d9b91',dangerous:'#b85f55'})[type] || '#c77d9c';
     return L.divIcon({
       className:'',
       html:`<div style="width:29px;height:29px;display:grid;place-items:center;border-radius:50% 50% 50% 12%;transform:rotate(-45deg);background:${color};border:3px solid #fff;box-shadow:0 3px 10px rgba(91,45,66,.3);color:#fff;font-size:14px;font-weight:900"><span style="transform:rotate(45deg)">${emoji}</span></div>`,
@@ -1002,13 +1020,19 @@ html[data-theme='dark']{--bg:#17121a;--surface:#211923;--surface2:#2b202a;--text
       const confirms=votes.filter(v=>v.vote_type==='confirm').length;
       const resolved=votes.filter(v=>v.vote_type==='resolved').length;
       const myVote=votes.find(v=>v.voter_token===voterToken)?.vote_type;
-      info.textContent = `Добавлено: ${dateText}. Подтверждений: ${confirms}.` + (['hazard','isolated'].includes(m.type)?` Отметок об устранении: ${resolved}.`:'');
+      info.textContent = `Добавлено: ${dateText}. Подтверждений: ${confirms}.` + (['hazard','dark','dangerous','isolated'].includes(m.type)?` Отметок об устранении: ${resolved}.`:'');
       info.style.cssText = 'font-size:11px;margin:4px 0 8px;max-width:230px';
+      if(m.type==='dangerous' && m.description){
+        const description=document.createElement('div');
+        description.textContent='Описание: '+m.description;
+        description.style.cssText='font-size:12px;margin:5px 0 8px;max-width:230px;white-space:pre-wrap';
+        popup.append(title,info,description);
+      }else popup.append(title,info);
       const actions=document.createElement('div');actions.style.cssText='display:flex;flex-wrap:wrap;gap:5px;margin:7px 0';
       const confirmBtn=document.createElement('button');confirmBtn.type='button';confirmBtn.className='mark-vote';confirmBtn.dataset.markId=String(m.id);confirmBtn.dataset.voteType='confirm';confirmBtn.textContent=myVote==='confirm'?'✓ Подтверждено':'👍 Подтверждаю';confirmBtn.disabled=!!myVote;
       [confirmBtn].forEach(b=>b.style.cssText='border:0;border-radius:8px;padding:7px 8px;background:#e0f2fe;color:#075985;font-weight:700;cursor:pointer;font-size:11px');
       actions.append(confirmBtn);
-      if(['hazard','isolated'].includes(m.type)){
+      if(['hazard','dark','dangerous','isolated'].includes(m.type)){
         const resolvedBtn=document.createElement('button');resolvedBtn.type='button';resolvedBtn.className='mark-vote';resolvedBtn.dataset.markId=String(m.id);resolvedBtn.dataset.voteType='resolved';resolvedBtn.textContent=myVote==='resolved'?'✓ Отмечено':'Проблема устранена';resolvedBtn.disabled=!!myVote;
         resolvedBtn.style.cssText='border:0;border-radius:8px;padding:7px 8px;background:#e0f2fe;color:#075985;font-weight:700;cursor:pointer;font-size:11px';
         actions.append(resolvedBtn);
@@ -1019,7 +1043,7 @@ html[data-theme='dark']{--bg:#17121a;--surface:#211923;--surface2:#2b202a;--text
       del.dataset.markId = String(m.id);
       del.textContent = '🗑 Удалить отметку';
       del.style.cssText = 'border:0;border-radius:9px;padding:7px 9px;background:#f8e1e6;color:#9b4d61;font-weight:700;cursor:pointer';
-      popup.append(title, info, actions, del);
+      popup.append(actions, del);
       marker.bindPopup(popup);
       marker.addTo(map);
       markLayers.set(String(m.id), marker);
@@ -1030,7 +1054,7 @@ html[data-theme='dark']{--bg:#17121a;--surface:#211923;--surface2:#2b202a;--text
     if(!supabaseClient) return false;
     const {data, error} = await supabaseClient
       .from('public_marks')
-      .select('id,type,lat,lng,created_at')
+      .select('id,type,lat,lng,description,created_at')
       .order('created_at', {ascending:true});
     if(error){
       console.error('Supabase load error:', error);
@@ -1160,12 +1184,19 @@ html[data-theme='dark']{--bg:#17121a;--surface:#211923;--surface2:#2b202a;--text
     if(pendingMarkPreview){map.removeLayer(pendingMarkPreview);pendingMarkPreview=null}
     $('modalBg').style.display='flex';
     document.querySelectorAll('.choice').forEach(c=>c.classList.remove('sel'));
+    $('markDescription').value='';
+    $('markDescription').style.display='none';
+    $('markDescriptionLabel').style.display='none';
     $('markHint').textContent='1. Выберите тип. 2. После этого коснитесь нужного места на карте.';
   }
   $('reportTop').onclick=openMarkModal;
 
   document.querySelectorAll('.choice').forEach(c=>c.onclick=()=>{
     pendingMarkType=c.dataset.type;
+    const needsDescription=pendingMarkType==='dangerous';
+    $('markDescription').style.display=needsDescription?'block':'none';
+    $('markDescriptionLabel').style.display=needsDescription?'block':'none';
+    if(!needsDescription)$('markDescription').value='';
     document.querySelectorAll('.choice').forEach(x=>x.classList.remove('sel'));
     c.classList.add('sel');
     pendingMarkPoint=null;
@@ -1195,6 +1226,9 @@ html[data-theme='dark']{--bg:#17121a;--surface:#211923;--surface2:#2b202a;--text
       lat: Number(pendingMarkPoint.lat),
       lng: Number(pendingMarkPoint.lng)
     };
+    if(pendingMarkType==='dangerous'){
+      newMark.description=$('markDescription').value.trim();
+    }
 
     $('saveMark').disabled = true;
     try{
@@ -1202,7 +1236,7 @@ html[data-theme='dark']{--bg:#17121a;--surface:#211923;--surface2:#2b202a;--text
         const {data, error} = await supabaseClient
           .from('public_marks')
           .insert(newMark)
-          .select('id,type,lat,lng,created_at')
+          .select('id,type,lat,lng,description,created_at')
           .single();
         if(error) throw error;
         marks.push({...data,lat:Number(data.lat),lng:Number(data.lng)});
