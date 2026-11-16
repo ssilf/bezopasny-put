@@ -1256,8 +1256,11 @@ html[data-theme='dark']{--bg:#17121a;--surface:#211923;--surface2:#2b202a;--text
       placingMark=false;pendingMarkType=null;pendingMarkPoint=null;
       if(pendingMarkPreview){map.removeLayer(pendingMarkPreview);pendingMarkPreview=null}
     }catch(e){
-      console.error('Supabase insert error:', e);
-      toast('Не удалось сохранить общую отметку. Проверьте подключение и правила Supabase.');
+      console.error('Supabase insert error:', {
+        message:e?.message, code:e?.code, details:e?.details, hint:e?.hint, error:e
+      });
+      const detail = e?.message || e?.details || 'неизвестная ошибка';
+      toast('Supabase: ' + String(detail).slice(0,150));
     }finally{
       $('saveMark').disabled = false;
     }
